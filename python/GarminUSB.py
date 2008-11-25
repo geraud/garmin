@@ -31,10 +31,8 @@ class Garmin:
             return
         for bus in usb.busses():
             for device in bus.devices:
-                log.debug('Inpsecting device %s', device)
                 if device.idVendor == Garmin.VENDOR_ID and device.idProduct == Garmin.PRODUCT_ID:
                     self.device = device
-                    log.debug('Found device')
                     break
 
         if self.device is None:
@@ -72,7 +70,7 @@ class Garmin:
 
     def write_packet (self,packet):
         self.open()
-        return self.handle.bulkWrite( self.bulk_out, packet, BULK_TIMEOUT )
+        return self.handle.bulkWrite( self.bulk_out, packet, Garmin.BULK_TIMEOUT )
 
     def start_session (self):
         packet = Packet.start_session()
@@ -83,14 +81,15 @@ class Garmin:
         response = self.read_packet()
         if len(response) != 16:
             raise USBException, 'Could not initiate session'
-        log.debg('Session started')
+        log.debug('Session started')
 
     def read_a000_a001 (self):
+        log.debug('Entering read_a000_a001')
         self.write_packet( Packet.encode_app(PacketID.PRODUCT_REQUEST) )
 
         while True:
             response = self.read_packet()
-            print response.decode()
+            log.debug('Decoded packet: %s', response.decode() )
             packed_id = response.id()
             if packed_id == PacketID.PRODUCT_DATA:
                 print 'product_data'
@@ -103,9 +102,11 @@ class Garmin:
                 print response
                 break
 
+        log.debug('Leaving read_a000_a001')
 
     def get_runs(self):
-        log.debug('Reading runs')
+        log.debug('Entering get_runs')
+        log.debug('Leaving get_runs')
         # # Read the runs, then the laps, then the track log.
         #
         #
