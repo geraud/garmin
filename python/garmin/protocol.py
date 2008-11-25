@@ -1,4 +1,6 @@
 import struct
+import logging
+log = logging.getLogger('garmin.protocol')
 
 class ProtocolException(Exception): pass
 
@@ -54,7 +56,7 @@ class Packet(PacketID):
   def encode (protocol, packet_id, payload = None ):
     message = struct.pack('<B3xH2xL', protocol, packet_id, len(payload or '') )
     if payload is not None:
-     message += payload
+      message += payload
     return message
 
   @staticmethod
@@ -66,16 +68,17 @@ class Packet(PacketID):
 
   def decode (self):
     decoder = {
-      PacketID.PROTOCOL_ARRAY : 'protocol'
-      ,PacketID.PRODUCT_DATA : 'product_data'
-      ,PacketID.SESSION_STARTED : 'session_started'
-      ,PacketID.EXTENDED_PRODUCT_DATA : 'extended_product_data'
-      }.get(self.id(),None)
+      0 : None
+      , PacketID.PROTOCOL_ARRAY : 'protocols'
+      , PacketID.PRODUCT_DATA : 'product_data'
+      , PacketID.EXTENDED_PRODUCT_DATA : 'extended_product_data'
+      }.get( self.id(), None )
     if decoder is None:
-      raise ProtocolException, 'Cannot decode packet with id [%04X]' % self.id()
+      log.warn('Unknown packet with id [%04X]', self.id() )
+      return None
     return getattr(self, 'd_%s' % decoder )( )
 
-  def d_protocol (self):
+  def d_protocols (self):
     return {}
 
   def d_product_data (self):

@@ -1,6 +1,8 @@
 #!/usr/bin/python
 import os, sys, array
 import usb
+import logging
+log = logging.getLogger()
 
 from garmin.protocol import *
 class USBException(Exception): pass
