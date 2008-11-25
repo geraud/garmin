@@ -81,16 +81,17 @@ class Garmin:
       raise USBException, 'Could not initiate session'
     print 'session started'
 
-  def read_a000_a0001 (self):
+  def read_a000_a001 (self):
     self.write_packet( Packet.encode_app(PacketID.PRODUCT_REQUEST) )
 
     while True:
       response = self.read_packet()
+      print response.decode()
       packed_id = response.id()
       if packed_id == PacketID.PRODUCT_DATA:
         print 'product_data'
         print response
-      elif packed_id == PacketID.EXT_PRODUCT_DATA:
+      elif packed_id == PacketID.EXTENDED_PRODUCT_DATA:
         print 'ext_product_data'
         print response
       elif packed_id == PacketID.PROTOCOL_ARRAY:
@@ -98,9 +99,31 @@ class Garmin:
         print response
         break
 
+
+  def get_runs(self):
+    print 'get runs'
+    # # Read the runs, then the laps, then the track log.
+    #
+    #
+    #   if ( garmin_send_command(garmin,Cmnd_Transfer_Runs) != 0 ) {
+    #     d = garmin_alloc_data(data_Dlist);
+    #     l = d->data;
+    #     garmin_list_append(l,garmin_read_records(garmin,Pid_Run,
+    #                garmin->datatype.run));
+    #     garmin_list_append(l,garmin_read_a906(garmin));
+    #     garmin_list_append(l,garmin_read_a302(garmin));
+    #   }
+    #
+    #   return d;
+    # }
+
+
+
   def test (self):
     self.start_session()
-    self.read_a000_a0001()
+    self.read_a000_a001()
+
+    self.get_runs()
 
 def main():
   dev = Garmin()

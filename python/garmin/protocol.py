@@ -9,12 +9,12 @@ class PacketID:
   START_SESSION   = 0x05
   SESSION_STARTED = 0x06
   # Basic Link Information
-  PROTOCOL_ARRAY    = 0x00FD
-  PRODUCT_REQUEST   = 0x00FE
-  PRODUCT_DATA      = 0x00FF
-  EXT_PRODUCT_DATA  = 0x00F8
+  PROTOCOL_ARRAY                = 0x00FD
+  PRODUCT_REQUEST               = 0x00FE
+  PRODUCT_DATA                  = 0x00FF
+  EXTENDED_PRODUCT_DATA         = 0x00F8
 
-  TRANSFER_RUNS     = 0x01C2
+  TRANSFER_RUNS                 = 0x01C2
 
 
 class Packet(PacketID):
@@ -43,11 +43,11 @@ class Packet(PacketID):
     return "<Packet protocol: %s, id: %04X, length: %s, payload: %s>" % (type_name, self.packet_id, len(self.payload), payload )
 
   @staticmethod
-  def encode_usb( packet_id , payload = None):
+  def encode_usb( packet_id, payload = None):
     return Packet.encode(0,packet_id,payload)
 
   @staticmethod
-  def encode_app( packet_id , payload = None):
+  def encode_app( packet_id, payload = None):
     return Packet.encode(20,packet_id,payload)
 
   @staticmethod
@@ -63,3 +63,26 @@ class Packet(PacketID):
 
   @classmethod
   def start_session (self): return self.encode_usb( self.START_SESSION )
+
+  def decode (self):
+    decoder = {
+      PacketID.PROTOCOL_ARRAY : 'protocol'
+      ,PacketID.PRODUCT_DATA : 'product_data'
+      ,PacketID.SESSION_STARTED : 'session_started'
+      ,PacketID.EXTENDED_PRODUCT_DATA : 'extended_product_data'
+      }.get(self.id(),None)
+    if decoder is None:
+      raise ProtocolException, 'Cannot decode packet with id [%04X]' % self.id()
+    return getattr(self, 'd_%s' % decoder )( )
+
+  def d_protocol (self):
+    return {}
+
+  def d_product_data (self):
+    return {}
+
+  def d_session_started (self):
+    return {}
+
+  def d_extended_product_data (self):
+    return {}
