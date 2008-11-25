@@ -1,22 +1,20 @@
 #!/usr/bin/python
-import os, sys, array
+import os, sys, array, logging
 import usb
-
-import logging
-log = logging.getLogger()
-
 from garmin.protocol import *
-class USBException(Exception): pass
 
-BULK_TIMEOUT=3000
-INTR_TIMEOUT=3000
-MAX_PACKET_SIZE=1024
+log = logging.getLogger('main')
+
+class USBException(Exception): pass
 
 
 class Garmin:
     VENDOR_ID =  0x091E
     PRODUCT_ID = 0x0003
     INTERFACE_ID = 0 # 0x1403
+    BULK_TIMEOUT=3000
+    INTR_TIMEOUT=3000
+    MAX_PACKET_SIZE=1024
 
     def __init__ (self):
         self.device = None
@@ -33,11 +31,14 @@ class Garmin:
             return
         for bus in usb.busses():
             for device in bus.devices:
+                log.debug('Inpsecting device %s', device)
                 if device.idVendor == Garmin.VENDOR_ID and device.idProduct == Garmin.PRODUCT_ID:
                     self.device = device
+                    log.debug('Found device')
                     break
-                if self.device is None:
-                    raise USBException, 'Device not found'
+
+        if self.device is None:
+            raise USBException, 'Device not found'
 
         interface = self.device.configurations[0].interfaces[0][0]
         for endpoint in interface.endpoints:
@@ -66,7 +67,7 @@ class Garmin:
 
     def read_packet (self):
         self.open()
-        bytes = self.handle.interruptRead( self.interrupt_in, MAX_PACKET_SIZE, INTR_TIMEOUT )
+        bytes = self.handle.interruptRead( self.interrupt_in, Garmin.MAX_PACKET_SIZE, Garmin.INTR_TIMEOUT )
         return Packet( array.array('B', bytes) )
 
     def write_packet (self,packet):
@@ -104,7 +105,7 @@ class Garmin:
 
 
     def get_runs(self):
-        print 'get runs'
+        log.debug('Reading runs')
         # # Read the runs, then the laps, then the track log.
         #
         #
@@ -125,7 +126,18 @@ class Garmin:
         self.read_a000_a001()
         self.get_runs()
 
+def init_logging ():
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(levelname)s %(name)s: %(message)s")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
 def main():
+    init_logging()
+
     dev = Garmin()
     try:
         dev.test()
