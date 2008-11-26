@@ -2,8 +2,9 @@ import struct
 import logging
 log = logging.getLogger('garmin.protocol')
 
-class ProtocolException(Exception): pass
+from garmin.utils import StructReader
 
+class ProtocolException(Exception): pass
 
 class PacketID:
     # USB Protocol Layer
@@ -22,16 +23,10 @@ class PacketID:
 class Packet(PacketID):
 
     def __init__ (self,data):
-        self.protocol, self.packet_id, payload_length = struct.unpack('<B3xH2xL',data[:12])
+        self.protocol, self.id, payload_length = struct.unpack('<B3xH2xL',data[:12])
         self.payload = data[12:]
         if len(self.payload) != payload_length:
             raise ProtocolException, 'Incorrect payload length'
-
-    def id (self):
-        return self.packet_id
-
-    def payload (self):
-        return self.payload
 
     def __len__ (self):
         return len(self.payload) + 12
@@ -42,7 +37,7 @@ class Packet(PacketID):
         else:
             type_name = 'APP'
         payload = ' '.join( map(lambda x: '%02X' % x, self.payload) )
-        return "<Packet protocol: %s, id: %04X, length: %s, payload: %s>" % (type_name, self.packet_id, len(self.payload), payload )
+        return "<Packet protocol: %s, id: %04X, length: %s, payload: %s>" % (type_name, self.id, len(self.payload), payload )
 
     @staticmethod
     def encode_usb( packet_id, payload = None):
@@ -67,26 +62,3 @@ class Packet(PacketID):
     def start_session (self):
         return self.encode_usb( self.START_SESSION )
 
-    def decode (self):
-        decoder = {
-            0 : None
-            , PacketID.PROTOCOL_ARRAY : 'protocols'
-            , PacketID.PRODUCT_DATA : 'product_data'
-            , PacketID.EXTENDED_PRODUCT_DATA : 'extended_product_data'
-        }.get( self.id(), None )
-        if decoder is None:
-            log.warn('Unknown packet with id [%04X]', self.id() )
-            return None
-        return getattr(self, 'd_%s' % decoder )( )
-
-    def d_protocols (self):
-        return {}
-
-    def d_product_data (self):
-        return {}
-
-    def d_session_started (self):
-        return {}
-
-    def d_extended_product_data (self):
-        return {}
