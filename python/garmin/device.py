@@ -23,9 +23,8 @@ class Garmin:
         self.interrupt_in = None
 
         # slots for infos gathered
-        self.product = Objectified()
-        self.protocols = []
-        # self.extended_product = Objectified()
+        self.product = Obj()
+        self.protocols = None
 
     def is_open (self):
         return self.handle is not None
@@ -77,13 +76,9 @@ class Garmin:
         return self.handle.bulkWrite( self.bulk_out, packet, Garmin.BULK_TIMEOUT )
 
     def start_session (self):
-        packet = Packet.start_session()
-        self.write_packet(packet)
-        # self.write_packet(packet)
-        # self.write_packet(packet)
-
-        response = self.read_packet()
-        if len(response) != 16:
+        self.write_packet( Packet.start_session() )
+        packet = self.read_packet()
+        if len(packet) != 16 or packet.id != PacketID.SESSION_STARTED:
             raise USBException, 'Could not initiate session'
         log.debug('Session started')
 
@@ -98,27 +93,14 @@ class Garmin:
     def get_runs(self):
         log.debug('Entering get_runs')
         log.debug('Leaving get_runs')
-        # # Read the runs, then the laps, then the track log.
-        #
-        #
-        #   if ( garmin_send_command(garmin,Cmnd_Transfer_Runs) != 0 ) {
-        #     d = garmin_alloc_data(data_Dlist);
-        #     l = d->data;
-        #     garmin_list_append(l,garmin_read_records(garmin,Pid_Run,
-        #                garmin->datatype.run));
-        #     garmin_list_append(l,garmin_read_a906(garmin));
-        #     garmin_list_append(l,garmin_read_a302(garmin));
-        #   }
-        #
-        #   return d;
-        # }
+
 
     def decode (self, packet):
         decoder = {
             0 : None
-            , PacketID.PROTOCOL_ARRAY : 'protocols'
-            , PacketID.PRODUCT_DATA : 'product_data'
-            , PacketID.EXTENDED_PRODUCT_DATA : '' # skip 'extended_product_data'
+           , PacketID.PROTOCOL_ARRAY : 'protocols'
+           , PacketID.PRODUCT_DATA : 'product_data'
+           , PacketID.EXTENDED_PRODUCT_DATA : '' # skip 'extended_product_data'
         }.get( packet.id, None )
         if decoder is None:
             log.warn('Unknown packet with id [%04X]', packet.id )
@@ -128,30 +110,25 @@ class Garmin:
         return getattr(self,'d_%s' % decoder)( StructReader(packet.payload) )
 
     def d_protocols (self, sr):
-        size = len(sr)
-        for i in range( size/3 ):
+        physical = None
+        link = None
+        protocols = {}
+        last_protocol = None
+        for i in range( len(sr)/3 ):
             tag, data = sr.read('<cH')
-            log.debug('processing protocol %d %s %s', tag, data )
-            if c == 'P':
-                log.debug('should set physical data to [%s]', data )
-            elif c == 'L':
-                log.debug('should set link to [%s]', data )
-            elif c == 'A':
-                log.debug('should set application to [%s]', data )
-            elif c== 'D':
-                log.debug('should set data to [%s]',data)
+            if tag == 'P':
+                physical, last_protocol = data, None
+            elif tag == 'L':
+                link, last_protocol = data, None
+            elif tag == 'A':
+                protocols[data], last_protocol = [], data
+            elif tag== 'D':
+                if last_protocol is None:
+                    msg = 'Not Protocol data [%s] no associated with a protocol!'
+                    raise ProtocolException, msg % data
+                protocols[last_protocol].append( data )
+        self.protocols = ProtocolManager(physical,link,protocols)
 
-
-            # typedef enum {
-            #   Tag_Phys_Prot_Id    = 'P',
-            #   Tag_Link_Prot_Id    = 'L',
-            #   Tag_Appl_Prot_Id    = 'A',
-            #   Tag_Data_Type_Id    = 'D'
-            # } A001_tag;
-
-            # self.protocols.append( Objectified(tag =  ))
-        log.debug('packet size [%s] -> [%s]', size, size / 3 )
-        return {}
 
     def d_product_data (self, sr):
         p = self.product

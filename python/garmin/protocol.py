@@ -62,3 +62,52 @@ class Packet(PacketID):
     def start_session (self):
         return self.encode_usb( self.START_SESSION )
 
+
+class ProtocolManager:
+    DECODED_NAMES = {
+        # FORMAT : CODE, DATA0, DATA1....
+        100:   [ 'waypoint.waypoint', 'waypoint.waypoint' ]
+        , 101: [ 'waypoint.category', 'waypoint.category' ]
+        , 200: [ 'route', 'route.header', 'route.waypoint' ]
+        , 201: [ 'route', 'route.header', 'route.waypoint', 'route.link' ]
+        , 300: [ 'track', 'track.data' ]
+        , 301: [ 'track', 'track.header', 'track.data' ]
+        , 302: [ 'track', 'track.header', 'track.data' ]
+        , 400: [ 'waypoint.proximity', 'waypoint.proximity' ]
+        , 500: [ 'almanac', 'almanac' ]
+        , 600: [ 'date_time', 'date_time' ]
+        , 650: [ 'flightbook', 'flightbook' ]
+        , 700: [ 'position', 'position']
+        , 800: [ 'pvt', 'pvt' ]
+        , 906: [ 'lap', 'lap' ]
+        ,1000: [ 'run', 'run' ]
+        ,1002: [ 'workout.workout', 'workout.workout' ]
+        ,1003: [ 'workout.occurrence', 'workout.occurrence' ]
+        ,1004: [ 'fitness', 'fitness' ]
+        ,1005: [ 'workout.limits', 'workout.limits' ]
+        ,1006: [ 'course.course', 'course.course' ]
+        ,1007: [ 'course.lap', 'course.lap' ]
+        ,1008: [ 'course.point', 'course.point' ]
+        ,1009: [ 'course.limits', 'course.limits' ]
+        ,1012: [ 'course.track', 'course.track.header', 'course.track.data' ]
+    }
+
+    def __init__ (self,pysical,link, protocols):
+        self.protocols = { 'protocol.physical' : pysical, 'protocol.link' : link }
+        for proto_code, proto_values in protocols.items():
+            names = self.DECODED_NAMES.get(proto_code,None)
+            if names is None:
+                continue
+            self.protocols['protocol.%s' % names[0]] = proto_code
+            for index, value_name in enumerate(names[1:]):
+                self.protocols['datatype.%s' % value_name] = proto_values[ index ]
+        log.debug('got:\n%s',self.protocols)
+
+    def has_protocol (self, name):
+        return self.protocols.get('protocol.%s' % name, None) is not None
+
+    def protocol (self, name):
+        return self.protocols['protocol.%s' % name]
+
+    def datatype (self, name):
+        return self.protocols['datatype.%s' % name]

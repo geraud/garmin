@@ -47,7 +47,7 @@ class StructReader:
         return len(self.data)
 
 
-class Objectified(dict):
+class Obj(dict):
     def __getattr__(self, attribute_name ):
         return self.__getitem__(attribute_name)
     def __setattr__(self, attribute_name, value ):
