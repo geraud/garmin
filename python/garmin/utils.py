@@ -17,10 +17,9 @@ class StructReader:
         return result
 
     def read_string (self):
-        """ Reads a 0 terminated string
-        """
+        # Reads a 0 terminated string
         end = self.index
-        while True:
+        for i in range( len(self.data) - self.index ):
             if 0 == self.data[end]:
                 break
             else:
@@ -32,8 +31,6 @@ class StructReader:
     def read_strings (self):
         result = []
         while not self.eof():
-            log.debug('read_string @%s',self.index)
-            log.debug('result: %s',result)
             result.append( self.read_string() )
         return result
 

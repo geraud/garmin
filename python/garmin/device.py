@@ -93,14 +93,6 @@ class Garmin:
         for i in range(3):
             packet = self.read_packet()
             self.decode(packet)
-            # if packet.id in [ PacketID.PRODUCT_DATA, PacketID.EXTENDED_PRODUCT_DATA ]:
-            #     log.debug('product [%s] [%s]',self.product,self.extended_product)
-            # elif packet.id == PacketID.PROTOCOL_ARRAY:
-            #     self.decode(packet)
-            #     print 'protocol_array'
-            #     print packet
-            #     break
-
         log.debug('Leaving read_a000_a001')
 
     def get_runs(self):
@@ -138,8 +130,24 @@ class Garmin:
     def d_protocols (self, sr):
         size = len(sr)
         for i in range( size/3 ):
-            tag, data = sr.read('<BH')
-            log.debug('processing protocol %d %s %s',i, tag, data )
+            tag, data = sr.read('<cH')
+            log.debug('processing protocol %d %s %s', tag, data )
+            if c == 'P':
+                log.debug('should set physical data to [%s]', data )
+            elif c == 'L':
+                log.debug('should set link to [%s]', data )
+            elif c == 'A':
+                log.debug('should set application to [%s]', data )
+            elif c== 'D':
+                log.debug('should set data to [%s]',data)
+
+
+            # typedef enum {
+            #   Tag_Phys_Prot_Id    = 'P',
+            #   Tag_Link_Prot_Id    = 'L',
+            #   Tag_Appl_Prot_Id    = 'A',
+            #   Tag_Data_Type_Id    = 'D'
+            # } A001_tag;
 
             # self.protocols.append( Objectified(tag =  ))
         log.debug('packet size [%s] -> [%s]', size, size / 3 )
