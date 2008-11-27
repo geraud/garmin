@@ -1,7 +1,9 @@
 import usb
 import array, logging
 from garmin.protocol import *
+from garmin.command import *
 from garmin.utils import *
+
 
 log = logging.getLogger('garmin.device')
 
@@ -82,9 +84,9 @@ class Garmin:
             raise USBException, 'Could not initiate session'
         log.debug('Session started')
 
-    def read_a000_a001 (self):
+    def read_device_capabiliies(self):
         log.debug('Entering read_a000_a001')
-        self.write_packet( Packet.encode_app(PacketID.PRODUCT_REQUEST) )
+        self.write_packet( Packet.encode(PacketID.PRODUCT_REQUEST) )
         for i in range(3):
             packet = self.read_packet()
             self.decode(packet)
@@ -92,7 +94,24 @@ class Garmin:
 
     def get_runs(self):
         log.debug('Entering get_runs')
+        self.protocols.enforce_support('run')
+        self.send_command('run')
+
+        command = TransferRuns().encode_for_device( self.protocols )
+        log.debug('command: %s', command )
+        command = TransferCourseTracks().encode_for_device( self.protocols )
+        log.debug('command: %s', command )
+
+
         log.debug('Leaving get_runs')
+
+
+    def make_command_packet (self):
+         pass
+
+    def send_command( self, command_name ):
+        self.make_command_packet()
+        pass
 
 
     def decode (self, packet):
@@ -138,5 +157,5 @@ class Garmin:
 
     def test (self):
         self.start_session()
-        self.read_a000_a001()
+        self.read_device_capabiliies()
         self.get_runs()

@@ -39,16 +39,17 @@ class Packet(PacketID):
         payload = ' '.join( map(lambda x: '%02X' % x, self.payload) )
         return "<Packet protocol: %s, id: %04X, length: %s, payload: %s>" % (type_name, self.id, len(self.payload), payload )
 
+
     @staticmethod
     def encode_usb( packet_id, payload = None):
-        return Packet.encode(0,packet_id,payload)
+        return Packet.encode_packet(0,packet_id,payload)
 
     @staticmethod
-    def encode_app( packet_id, payload = None):
-        return Packet.encode(20,packet_id,payload)
+    def encode( packet_id, payload = None):
+        return Packet.encode_packet(20,packet_id,payload)
 
     @staticmethod
-    def encode (protocol, packet_id, payload = None ):
+    def encode_packet (protocol, packet_id, payload = None ):
         message = struct.pack('<B3xH2xL', protocol, packet_id, len(payload or '') )
         if payload is not None:
             message += payload
@@ -66,7 +67,7 @@ class Packet(PacketID):
 class ProtocolManager:
     DECODED_NAMES = {
         # FORMAT : CODE, DATA0, DATA1....
-        100:   [ 'waypoint.waypoint', 'waypoint.waypoint' ]
+        100:   [ 'waypoint', 'waypoint' ]
         , 101: [ 'waypoint.category', 'waypoint.category' ]
         , 200: [ 'route', 'route.header', 'route.waypoint' ]
         , 201: [ 'route', 'route.header', 'route.waypoint', 'route.link' ]
@@ -81,11 +82,11 @@ class ProtocolManager:
         , 800: [ 'pvt', 'pvt' ]
         , 906: [ 'lap', 'lap' ]
         ,1000: [ 'run', 'run' ]
-        ,1002: [ 'workout.workout', 'workout.workout' ]
-        ,1003: [ 'workout.occurrence', 'workout.occurrence' ]
+        ,1002: [ 'workout', 'workout' ]
+        ,1003: [ 'workout.occurrences', 'workout.occurrences' ]
         ,1004: [ 'fitness', 'fitness' ]
         ,1005: [ 'workout.limits', 'workout.limits' ]
-        ,1006: [ 'course.course', 'course.course' ]
+        ,1006: [ 'course', 'course' ]
         ,1007: [ 'course.lap', 'course.lap' ]
         ,1008: [ 'course.point', 'course.point' ]
         ,1009: [ 'course.limits', 'course.limits' ]
@@ -93,7 +94,7 @@ class ProtocolManager:
     }
 
     def __init__ (self,pysical,link, protocols):
-        self.protocols = { 'protocol.physical' : pysical, 'protocol.link' : link }
+        self.protocols = { 'protocol.physical' : pysical, 'protocol.link' : int(link) }
         for proto_code, proto_values in protocols.items():
             names = self.DECODED_NAMES.get(proto_code,None)
             if names is None:
@@ -101,13 +102,29 @@ class ProtocolManager:
             self.protocols['protocol.%s' % names[0]] = proto_code
             for index, value_name in enumerate(names[1:]):
                 self.protocols['datatype.%s' % value_name] = proto_values[ index ]
-        log.debug('got:\n%s',self.protocols)
 
-    def has_protocol (self, name):
+    def __getattr__(self,name):
+        if name.startswith('has_'):
+            return self.supports( name[4:] )
+        elif name.startswith('supports_'):
+            return self.supports( name[9:] )
+        else:
+            value = self.protocols.get('protocol.%s'%name,None)
+            if value is not None:
+                return value
+        return super(object,self).__getattr__(name)
+
+    def supports (self, name):
         return self.protocols.get('protocol.%s' % name, None) is not None
 
-    def protocol (self, name):
+    def _code (self, name):
         return self.protocols['protocol.%s' % name]
 
     def datatype (self, name):
         return self.protocols['datatype.%s' % name]
+
+    def enforce_support (self,name):
+        if self.supports(name):
+            return
+        raise ProtocolException, 'Protocol [%s] not supported by device' % name
+
