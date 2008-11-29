@@ -9,12 +9,12 @@ class CommandException(Exception): pass
 
 class Base:
 
-    def check_support_by (self, device):
+    def check_device_support (self, device):
         log.debug('Checking support for device')
-        self.check_protocol( device )
+        self.check_protocol_support( device )
         self.check_link_support( device )
 
-    def check_protocol (self, device):
+    def check_protocol_support (self, device):
         log.debug('Checking protocol')
         for protocol in self.RequiredProtocol:
             if not device.supports( protocol ):
@@ -36,12 +36,20 @@ class Base:
         return { 1: 0x0A, 2:0x0B }[ link_type ]
 
     def encode_for_device (self, device):
-        self.check_support_by( device )
+        self.check_device_support( device )
         link = self.link_code( device.link )
-        code = self.command_code( device.link )
-        return Packet.encode( link, struct.pack('<H',code) )
+        command = self.command_code( device.link )
+        return Packet.encode( link, struct.pack('<H',command) )
 
+class StartSession(Base):
+    Codes = [ 0x05, None ]
+    def encode_for_device (self,device):
+        return Packet.encode_usb( self.Codes[0] )
 
+class GetDeviceDescription(Base):
+    Codes = [ 254 , None]
+    def encode_for_device (self,device):
+        return Packet.encode( self.Codes[0] )
 
 class AbortTransfer(Base):
     Codes = [ 0, 0 ]
@@ -135,7 +143,7 @@ class TransferCoursePoints(Transfer):
 class TransferCourseTracks(Transfer):
     Codes = [ 564, None ]
 
-    def check_protocol( self, device ):
+    def check_protocol_support( self, device ):
         return device.supports('track') or device.supports('course.track')
 
 class TransferCourseLimits(Transfer):

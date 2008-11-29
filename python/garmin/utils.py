@@ -54,3 +54,6 @@ class Obj(dict):
         return self.__setitem__(attribute_name,value)
 
 
+def data_as_string (data):
+    return ' '.join( map(lambda x: '%02X' % x, data) )
+

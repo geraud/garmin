@@ -78,55 +78,59 @@ class Garmin:
         return self.handle.bulkWrite( self.bulk_out, packet, Garmin.BULK_TIMEOUT )
 
     def start_session (self):
-        self.write_packet( Packet.start_session() )
+        self.send_command( StartSession() )
+        packet_id, response = self.read_response()
         packet = self.read_packet()
-        if len(packet) != 16 or packet.id != PacketID.SESSION_STARTED:
+        if packet.id != PacketID.SESSION_STARTED:
             raise USBException, 'Could not initiate session'
         log.debug('Session started')
 
     def read_device_capabiliies(self):
-        log.debug('Entering read_a000_a001')
-        self.write_packet( Packet.encode(PacketID.PRODUCT_REQUEST) )
+        log.debug('Entering read_device_capabiliies')
+        self.send_command( GetDeviceDescription() )
         for i in range(3):
-            packet = self.read_packet()
-            self.decode(packet)
-        log.debug('Leaving read_a000_a001')
+            self.read_response()
+        log.debug('Leaving read_device_capabiliies')
 
     def get_runs(self):
         log.debug('Entering get_runs')
-        self.protocols.enforce_support('run')
-        self.send_command('run')
-
-        command = TransferRuns().encode_for_device( self.protocols )
-        log.debug('command: %s', command )
-        command = TransferCourseTracks().encode_for_device( self.protocols )
-        log.debug('command: %s', command )
-
-
+        self.send_command( TransferRuns() )
+        while True:
+            data = self.read_response()
+            if data is None:
+                break
+            log.debug('should do something with the data: [%s]', data )
         log.debug('Leaving get_runs')
 
+    def send_command( self, command ):
+        log.debug('Sending command: %s', command )
+        packet = command.encode_for_device( self.protocols )
+        self.write_packet( packet )
 
-    def make_command_packet (self):
-         pass
-
-    def send_command( self, command_name ):
-        self.make_command_packet()
-        pass
-
+    def read_response (self):
+        packet = self.read_packet()
+        if packet.payload is None:
+            return None
+        return self.decode( packet )
 
     def decode (self, packet):
         decoder = {
             0 : None
-           , PacketID.PROTOCOL_ARRAY : 'protocols'
-           , PacketID.PRODUCT_DATA : 'product_data'
-           , PacketID.EXTENDED_PRODUCT_DATA : '' # skip 'extended_product_data'
+            , PacketID.SESSION_STARTED : 'session_started'
+            , PacketID.PROTOCOL_ARRAY : 'protocols'
+            , PacketID.PRODUCT_DATA : 'product_data'
+            , PacketID.EXTENDED_PRODUCT_DATA : 'extended_product_data'
         }.get( packet.id, None )
         if decoder is None:
             log.warn('Unknown packet with id [%04X]', packet.id )
             return None
         if decoder is '':
             return None
-        return getattr(self,'d_%s' % decoder)( StructReader(packet.payload) )
+        return packet.id, getattr(self,'d_%s' % decoder)( StructReader(packet.payload) )
+
+    def d_session_started (self, sr):
+        log.debug('session started')
+        self.device_id = sr.read('<l')
 
     def d_protocols (self, sr):
         physical = None
@@ -146,14 +150,22 @@ class Garmin:
                     msg = 'Not Protocol data [%s] no associated with a protocol!'
                     raise ProtocolException, msg % data
                 protocols[last_protocol].append( data )
-        self.protocols = ProtocolManager(physical,link,protocols)
-
+        self.protocols = ProtocolManager( physical, link, protocols )
 
     def d_product_data (self, sr):
         p = self.product
         p.product_id, p.software_version = sr.read('<Hh')
         p.description= sr.read_string()
         p.extra = p.get('extra',[])
+        p.extra.extend( sr.read_strings() )
+        log.debug('product id %d',p.product_id)
+        log.debug('software_version: %s', p.software_version )
+
+    def d_extended_product_data (self, sr):
+        p = self.product
+        p.extended_data = sr.read_strings()
+
+
 
     def test (self):
         self.start_session()

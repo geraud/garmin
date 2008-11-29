@@ -2,7 +2,7 @@ import struct
 import logging
 log = logging.getLogger('garmin.protocol')
 
-from garmin.utils import StructReader
+from garmin.utils import StructReader,data_as_string
 
 class ProtocolException(Exception): pass
 
@@ -13,7 +13,6 @@ class PacketID:
     SESSION_STARTED = 0x06
     # Basic Link Information
     PROTOCOL_ARRAY                = 0x00FD
-    PRODUCT_REQUEST               = 0x00FE
     PRODUCT_DATA                  = 0x00FF
     EXTENDED_PRODUCT_DATA         = 0x00F8
 
@@ -36,8 +35,9 @@ class Packet(PacketID):
             type_name = 'USB'
         else:
             type_name = 'APP'
-        payload = ' '.join( map(lambda x: '%02X' % x, self.payload) )
-        return "<Packet protocol: %s, id: %04X, length: %s, payload: %s>" % (type_name, self.id, len(self.payload), payload )
+
+        msg = "<Packet protocol: %s, id: %04X, length: %s, payload: %s>"
+        return msg % ( type_name, self.id, len(self.payload), data_as_string(self.payload) )
 
 
     @staticmethod
@@ -58,11 +58,6 @@ class Packet(PacketID):
     @staticmethod
     def dump ( data ):
         return ''.join( map( lambda x: '\\x%02x' % ord(x), data) )
-
-    @classmethod
-    def start_session (self):
-        return self.encode_usb( self.START_SESSION )
-
 
 class ProtocolManager:
     DECODED_NAMES = {
@@ -123,7 +118,7 @@ class ProtocolManager:
     def datatype (self, name):
         return self.protocols['datatype.%s' % name]
 
-    def enforce_support (self,name):
+    def enforce_support (self, name):
         if self.supports(name):
             return
         raise ProtocolException, 'Protocol [%s] not supported by device' % name
