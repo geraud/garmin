@@ -18,7 +18,12 @@ def main():
     init_logging()
     dev = Garmin()
     try:
-        dev.test()
+        dev.start_session()
+        dev.read_device_capabiliies()
+        log.debug("device : %s",dev)
+        log.debug('protocols: %s', dev.protocols)
+        dev.get_runs()
+
     finally:
         dev.close()
 

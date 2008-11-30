@@ -1,5 +1,4 @@
-import struct
-import logging
+import struct, logging
 
 from garmin.protocol import Packet
 
@@ -10,18 +9,15 @@ class CommandException(Exception): pass
 class Base:
 
     def check_device_support (self, device):
-        log.debug('Checking support for device')
         self.check_protocol_support( device )
         self.check_link_support( device )
 
     def check_protocol_support (self, device):
-        log.debug('Checking protocol')
         for protocol in self.RequiredProtocol:
             if not device.supports( protocol ):
                 raise CommandException, 'Command not supported'
 
     def check_link_support (self, device):
-        log.debug('Checking link support')
         code = self.command_code( device.link )
         if code is None:
             raise CommandException, 'Command not supported'

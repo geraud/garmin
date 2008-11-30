@@ -1,25 +1,26 @@
-import struct
-import logging
+import struct, logging
 log = logging.getLogger('garmin.protocol')
 
-from garmin.utils import StructReader,data_as_string
+from garmin.utils import StructReader, hexdump
 
 class ProtocolException(Exception): pass
 
-class PacketID:
+class Packet:
+
     # USB Protocol Layer
-    DATA_AVAILABLE  = 0x02
-    START_SESSION   = 0x05
-    SESSION_STARTED = 0x06
+    DATA_AVAILABLE              = 0x0002
+    START_SESSION               = 0x0005
+    SESSION_STARTED             = 0x0006
     # Basic Link Information
-    PROTOCOL_ARRAY                = 0x00FD
-    PRODUCT_DATA                  = 0x00FF
-    EXTENDED_PRODUCT_DATA         = 0x00F8
+    TRANSFER_COMPLETE           = 0x000C
+    RECORDS                     = 0x001B
+    PROTOCOL_ARRAY              = 0x00FD
+    PRODUCT_DATA                = 0x00FF
+    EXTENDED_PRODUCT_DATA       = 0x00F8
+    TRANSFER_RUNS               = 0x01C2
+    RUN                         = 0X03DE
+    LAP                         = 0x0095
 
-    TRANSFER_RUNS                 = 0x01C2
-
-
-class Packet(PacketID):
 
     def __init__ (self,data):
         self.protocol, self.id, payload_length = struct.unpack('<B3xH2xL',data[:12])
@@ -37,7 +38,7 @@ class Packet(PacketID):
             type_name = 'APP'
 
         msg = "<Packet protocol: %s, id: %04X, length: %s, payload: %s>"
-        return msg % ( type_name, self.id, len(self.payload), data_as_string(self.payload) )
+        return msg % ( type_name, self.id, len(self.payload), hexdump(self.payload) )
 
 
     @staticmethod

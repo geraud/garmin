@@ -80,27 +80,33 @@ class Garmin:
     def start_session (self):
         self.send_command( StartSession() )
         packet_id, response = self.read_response()
-        packet = self.read_packet()
-        if packet.id != PacketID.SESSION_STARTED:
+        if packet_id != Packet.SESSION_STARTED:
             raise USBException, 'Could not initiate session'
-        log.debug('Session started')
+        self.device_id = response
 
     def read_device_capabiliies(self):
-        log.debug('Entering read_device_capabiliies')
         self.send_command( GetDeviceDescription() )
         for i in range(3):
             self.read_response()
-        log.debug('Leaving read_device_capabiliies')
 
     def get_runs(self):
         log.debug('Entering get_runs')
         self.send_command( TransferRuns() )
-        while True:
-            data = self.read_response()
-            if data is None:
-                break
-            log.debug('should do something with the data: [%s]', data )
+        runs = self.get_records( Packet.RUN )
+        # now get the laps
+        for run in runs:
+            log.debug('drilling down for run:\n%s', run)
+            log.debug('should get lap %d->%d',run.first_lap_index,run.last_lap_index)
+        self.get_laps()
         log.debug('Leaving get_runs')
+
+
+    def get_laps(self):
+        log.debug('Entering get_laps')
+        self.send_command( TransferLaps() )
+        laps = self.get_records( Packet.LAP )
+        log.debug('Leaving get_laps')
+
 
     def send_command( self, command ):
         log.debug('Sending command: %s', command )
@@ -110,27 +116,97 @@ class Garmin:
     def read_response (self):
         packet = self.read_packet()
         if packet.payload is None:
-            return None
+            log.debug('done')
+            return packet.id, None
         return self.decode( packet )
 
+    def get_records (self, expected_packet_id):
+        result = []
+        while True:
+            packet_id, response = self.read_response()
+            if packet_id == Packet.RECORDS:
+                record_count = response
+            elif packet_id == expected_packet_id:
+                result.append( response )
+            elif packet_id == Packet.TRANSFER_COMPLETE:
+                break
+            else:
+                msg = 'Unexpected packe with id [%04x]'
+                raise ProtocolException, msg % expected_packet_id
+        return result
+
     def decode (self, packet):
+        # log.debug('decoding: %s/%03x %s', packet.id, packet.id, hexdump(packet.payload) )
         decoder = {
             0 : None
-            , PacketID.SESSION_STARTED : 'session_started'
-            , PacketID.PROTOCOL_ARRAY : 'protocols'
-            , PacketID.PRODUCT_DATA : 'product_data'
-            , PacketID.EXTENDED_PRODUCT_DATA : 'extended_product_data'
+            , Packet.SESSION_STARTED        : 'ulong'
+            , Packet.PROTOCOL_ARRAY         : 'protocols'
+            , Packet.TRANSFER_COMPLETE      : 'ushort'
+            , Packet.PRODUCT_DATA           : 'product_data'
+            , Packet.EXTENDED_PRODUCT_DATA  : 'extended_product_data'
+            , Packet.RECORDS                : 'ushort'
+            , Packet.RUN                    : 'run_type'
+            , Packet.LAP                    : 'lap_type'
         }.get( packet.id, None )
         if decoder is None:
             log.warn('Unknown packet with id [%04X]', packet.id )
             return None
         if decoder is '':
             return None
-        return packet.id, getattr(self,'d_%s' % decoder)( StructReader(packet.payload) )
+        return packet.id, getattr(self,'d_%s' % decoder)( StructReader(packet.payload, endianness ='<') )
 
-    def d_session_started (self, sr):
-        log.debug('session started')
-        self.device_id = sr.read('<l')
+    def d_ulong (self, sr):
+        return sr.read('L')[0]
+
+    def d_ushort (self, sr):
+        return sr.read('H')[0]
+
+    def d_run_type (self,sr):
+        track_index, first_lap_index, last_lap_index = sr.read('3h')
+        sport_type, program_type, multisport = sr.read('3B')
+        sr.skip(3)
+        time,distance = sr.read('2L')
+        workout = self.d_workout_type(sr)
+        # log.debug('-'*80)
+        # log.debug( 'track_index first lap last lap: %d %d %d', track_index, first_lap_index, last_lap_index )
+        # log.debug('       sport: %d', sport_type )
+        # log.debug('program_type: %d', program_type )
+        # log.debug('  multisport: %d', multisport )
+        # log.debug('        time: %x', time )
+        # log.debug('    duration: %x', distance )
+        # log.debug('     workout: %s', workout )
+        keys = ( 'track_index', 'first_lap_index', 'last_lap_index', 'sport_type', 'program_type','multisport','time', 'distance', 'workout')
+        values = ( track_index, first_lap_index, last_lap_index, sport_type, program_type, multisport,time, distance, workout )
+        return Obj(zip(keys,values))
+
+    def d_lap_type (self,sr):
+        index = sr.read('L')
+        start_time = sr.read_time()
+        log.debug('got time %s', start_time)
+        # uint32 index; /* Unique among all laps received from device */
+        #  time_type start_time; /* Start of lap time */
+        #  uint32 total_time; /* Duration of lap, in hundredths of a second */
+        #  float32 total_dist; /* Distance in meters */
+        #  float32 max_speed; /* In meters per second */
+        #  position_type begin; /* Invalid if both lat and lon are 0x7FFFFFFF */
+        #  position_type end; /* Invalid if both lat and lon are 0x7FFFFFFF */
+        #  uint16 calories; /* Calories burned this lap */
+        #  uint8 avg_heart_rate; /* In beats-per-minute, 0 if invalid */
+        #  uint8 max_heart_rate; /* In beats-per uint8 intensity; /* See below */
+
+
+
+    def d_workout_type (self,sr):
+        valid_steps_counts = sr.read('L')[0]
+        steps = []
+        for i in xrange(20):
+            keys = [ 'custom_name','target_custom_zone_low','target_custom_zone_high'
+                    ,'duration_value','intensity','duration_type','target_type'
+                    ,'target_value']
+            values = sr.read('16s 2f H 4B 2x')
+            steps.append( Obj(zip(keys,values)) )
+        name, sport_type =  sr.read('16s B')
+        return name,sport_type,steps[:valid_steps_counts]
 
     def d_protocols (self, sr):
         physical = None
@@ -138,7 +214,7 @@ class Garmin:
         protocols = {}
         last_protocol = None
         for i in range( len(sr)/3 ):
-            tag, data = sr.read('<cH')
+            tag, data = sr.read('c H')
             if tag == 'P':
                 physical, last_protocol = data, None
             elif tag == 'L':
@@ -154,20 +230,11 @@ class Garmin:
 
     def d_product_data (self, sr):
         p = self.product
-        p.product_id, p.software_version = sr.read('<Hh')
+        p.product_id, p.software_version = sr.read('H h')
         p.description= sr.read_string()
         p.extra = p.get('extra',[])
         p.extra.extend( sr.read_strings() )
-        log.debug('product id %d',p.product_id)
-        log.debug('software_version: %s', p.software_version )
 
     def d_extended_product_data (self, sr):
         p = self.product
         p.extended_data = sr.read_strings()
-
-
-
-    def test (self):
-        self.start_session()
-        self.read_device_capabiliies()
-        self.get_runs()
