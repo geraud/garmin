@@ -1,64 +1,151 @@
 import struct, logging
+from garmin.usbio   import GarminUSB
+from garmin.packet  import *
+from garmin.utils   import Obj
 log = logging.getLogger('garmin.protocol')
 
 from garmin.utils import StructReader, hexdump
 
 class ProtocolException(Exception): pass
 
-class Packet:
 
-    # USB Protocol Layer
-    DATA_AVAILABLE              = 0x0002
-    START_SESSION               = 0x0005
-    SESSION_STARTED             = 0x0006
-    # Basic Link Information
-    TRANSFER_COMPLETE           = 0x000C
-    RECORDS                     = 0x001B
-    PROTOCOL_ARRAY              = 0x00FD
-    PRODUCT_DATA                = 0x00FF
-    EXTENDED_PRODUCT_DATA       = 0x00F8
-    TRANSFER_RUNS               = 0x01C2
-    RUN                         = 0X03DE
-    LAP                         = 0x0095
+class USBPacketDevice( GarminUSB ):
 
+    def get_protocols (self):
+        raise Exception, 'Please override me and by a method that returns a ProtocolManager'
 
-    def __init__ (self,data):
-        self.protocol, self.id, payload_length = struct.unpack('<B3xH2xL',data[:12])
-        self.payload = data[12:]
-        if len(self.payload) != payload_length:
-            raise ProtocolException, 'Incorrect payload length'
+    def execute_reader( self, reader ):
+        reader.next()
+        while True:
+            result = reader.send( self.read_response() )
+            if result is not None:
+                return result
 
-    def __len__ (self):
-        return len(self.payload) + 12
+    def send_command (self, command):
+        log.debug('Sending command: %s', command )
+        packet = command.encode_for_device( self.get_protocols() )
+        self.write_packet( packet )
 
-    def __str__ (self):
-        if self.protocol == 0:
-            type_name = 'USB'
+    def read_response (self):
+        packet = self.read_packet()
+        if packet.payload is None:
+            log.debug('done')
+            return packet.id, None
+        return self.decode( packet )
+
+    def decode (self, packet):
+        # log.debug('decoding: %04X (%d) length: %d %s', packet.id, packet.id, len(packet.payload), hexdump(packet.payload) )
+        decoder = {
+            0 : None
+            , Packet.SESSION_STARTED        : 'ulong'
+            , Packet.PROTOCOL_ARRAY         : 'protocol_array'
+            , Packet.TRANSFER_COMPLETE      : 'ushort'
+            , Packet.PRODUCT_DATA           : 'product_data'
+            , Packet.EXTENDED_PRODUCT_DATA  : 'extended_product_data'
+            , Packet.RECORDS                : 'ushort'
+            , Packet.RUN                    : 'run'
+            , Packet.LAP                    : 'lap'
+            , Packet.TRACK_HEADER           : 'track_header'
+            , Packet.TRACK_DATA             : 'track_data'
+        }.get( packet.id, None )
+        if decoder is None:
+            log.warn('Skipping unknown packet with id [%04X] (%d)', packet.id, packet.id )
+            return None
+        if decoder is '':
+            return None
+        return packet.id, getattr(self,'d_%s' % decoder)( StructReader(packet.payload, endianness ='<') )
+
+    def d_ulong (self, sr):
+        return sr.read('L')
+
+    def d_ushort (self, sr):
+        return sr.read('H')
+
+    def d_run (self,sr):
+        track_index, first_lap_index, last_lap_index = sr.read('3h')
+        sport, program, multisport = sr.read('3B 3x')
+        time,distance = sr.read('2L')
+        workout = self.d_workout(sr)
+
+        keys = ( 'track_index', 'first_lap_index', 'last_lap_index', 'sport', 'program','multisport','time', 'distance', 'workout')
+        values = ( track_index, first_lap_index, last_lap_index, sport, program, multisport,time, distance, workout )
+        return Obj(zip(keys,values))
+
+    def d_lap (self,sr):
+        index = sr.read('H 2x')
+        start_time = sr.read_time()
+        duration, distance, max_speed  = sr.read('L 2f')
+        begin = sr.read_position()
+        end = sr.read_position()
+        calories, average_heart_rate, maximum_heart_rate, intensity, average_cadence, trigger_method = sr.read('H 5B')
+
+        keys = ( 'index', 'start_time', 'duration', 'distance', 'max_speed', 'begin', 'end', 'calories', 'average_heart_rate', 'maximum_heart_rate', 'intensity', 'average_cadence', 'trigger_method' )
+        values = ( index, start_time, duration, distance, max_speed, begin, end, calories, average_heart_rate, maximum_heart_rate, intensity, average_cadence, trigger_method )
+        return Obj(zip(keys,values))
+
+    def d_workout (self,sr):
+        valid_steps_counts = sr.read('L')
+        steps = []
+        for i in xrange(20):
+            keys = [ 'custom_name','target_custom_zone_low','target_custom_zone_high'
+                    ,'duration_value','intensity','duration','target'
+                    ,'target_value']
+            values = sr.read('16s 2f H 4B 2x')
+            steps.append( Obj(zip(keys,values)) )
+        name, sport =  sr.read('16s B')
+        return name,sport,steps[:valid_steps_counts]
+
+    def d_track_header (self, sr):
+        log.debug('should decode track header %s', hexdump(sr.data) )
+        protocols = self.get_protocols()
+        datatype = protocols.datatype('track.header')
+
+        if datatype == 311:
+            return sr.read('H')
+
+        elif datatype in [ 310, 312 ]:
+            display, color = sr.read('2B')
+            identifier = sr.read_string()
+            return Obj( display = display, color = color, identifier = identifier )
         else:
-            type_name = 'APP'
+            raise ProtocolException, 'Cannot decode Track Header with datatype [%d]' % datatype
+        
 
-        msg = "<Packet protocol: %s, id: %04X, length: %s, payload: %s>"
-        return msg % ( type_name, self.id, len(self.payload), hexdump(self.payload) )
+        return None
 
+    def d_track_data (self,sr):
+        # log.debug('should decode track data %s', hexdump(sr.data) )
+        return '.'
 
-    @staticmethod
-    def encode_usb( packet_id, payload = None):
-        return Packet.encode_packet(0,packet_id,payload)
+    def d_protocol_array (self, sr):
+        physical = None
+        link = None
+        protocols = {}
+        last_protocol = None
+        for i in range( len(sr)/3 ):
+            tag, data = sr.read('c H')
+            if tag == 'P':
+                physical, last_protocol = data, None
+            elif tag == 'L':
+                link, last_protocol = data, None
+            elif tag == 'A':
+                protocols[data], last_protocol = [], data
+            elif tag== 'D':
+                if last_protocol is None:
+                    msg = 'Not Protocol data [%s] no associated with a protocol!'
+                    raise ProtocolException, msg % data
+                protocols[last_protocol].append( data )
+        return ProtocolManager( physical, link, protocols )
 
-    @staticmethod
-    def encode( packet_id, payload = None):
-        return Packet.encode_packet(20,packet_id,payload)
+    def d_product_data (self, sr):
+        p = Obj()
+        p.product_id, p.software_version = sr.read('H h')
+        p.description = sr.read_string()
+        p.extra =  sr.read_strings()
+        return p
 
-    @staticmethod
-    def encode_packet (protocol, packet_id, payload = None ):
-        message = struct.pack('<B3xH2xL', protocol, packet_id, len(payload or '') )
-        if payload is not None:
-            message += payload
-        return message
-
-    @staticmethod
-    def dump ( data ):
-        return ''.join( map( lambda x: '\\x%02x' % ord(x), data) )
+    def d_extended_product_data (self, sr):
+        return sr.read_strings()
 
 class ProtocolManager:
     DECODED_NAMES = {

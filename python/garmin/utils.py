@@ -26,7 +26,10 @@ class StructReader:
         size = struct.calcsize( format )
         result = struct.unpack_from( format, self.data, self.index )
         self.index += size
-        return result
+        if len(result) == 1:
+            return result[0]
+        else:
+            return result
 
     def read_string (self):
         end = self.index
@@ -46,7 +49,10 @@ class StructReader:
         return result
 
     def read_time (self):
-        return  GARMIN_EPOCH + datetime.timedelta( seconds = self.read('L')[0] )
+        return  GARMIN_EPOCH + datetime.timedelta( seconds = self.read('L') )
+
+    def read_position (self):
+        return self.read('2l')
 
     def eof(self):
         return self.index >= len(self.data)
