@@ -4,7 +4,7 @@ from garmin.protocol import Packet
 
 log = logging.getLogger('garmin.command')
 
-class CommandException(Exception): pass
+class CommandException (Exception): pass
 
 class Base:
 
@@ -37,111 +37,111 @@ class Base:
         command = self.command_code( device.link )
         return Packet.encode( link, struct.pack('<H',command) )
 
-class StartSession(Base):
+class StartSession (Base):
     Codes = [ 0x05, None ]
     def encode_for_device (self,device):
         return Packet.encode_usb( self.Codes[0] )
 
-class GetDeviceDescription(Base):
+class GetDeviceDescription (Base):
     Codes = [ 254 , None]
     def encode_for_device (self,device):
         return Packet.encode( self.Codes[0] )
 
-class AbortTransfer(Base):
+class AbortTransfer (Base):
     Codes = [ 0, 0 ]
     RequiredProtocol = []
 
-class Transfer(Base): pass
+class Transfer (Base): pass
 
-class TransferAlmanac(Transfer):
+class TransferAlmanac (Transfer):
     Codes = [ 1, 4]
     RequiredProtocol = [ 'almanac' ]
 
-class TransferPosition(Transfer):
+class TransferPosition (Transfer):
     Codes = [ 2, None ]
     RequiredProtocol = [ 'position' ]
 
-class TransferProximityWaypoints(Transfer):
+class TransferProximityWaypoints (Transfer):
     Codes = [ 3, 17 ]
     RequiredProtocol = [ 'waypoint.proximity' ]
 
-class TransferRoute(Transfer):
+class TransferRoute (Transfer):
     Codes = [ 4, 8 ]
     RequiredProtocol = [ 'route' ]
 
-class TransferTime(Transfer):
+class TransferTime (Transfer):
     Codes = [ 5, 20 ]
     RequiredProtocol = [ 'date_time' ]
 
-class TransferTrackLog(Transfer):
+class TransferTrackLog (Transfer):
     Codes = [ 6, None ]
     RequiredProtocol = [ 'track' ]
 
-class TransferWaypoints(Transfer):
+class TransferWaypoints (Transfer):
     Codes = [ 7, 21 ]
     RequiredProtocol = [ 'waypoint' ]
 
-class PowerOff(Base):
+class PowerOff (Base):
     Codes = [ 8, 26 ]
 
-class StartPVTDownload(Base):
+class StartPVTDownload (Base):
     Codes = [ 49, None ]
     RequiredProtocol = [ 'pvt' ]
 
-class StopPVTDownload(Base):
+class StopPVTDownload (Base):
     Codes = [ 50, None ]
     RequiredProtocol = [ 'pvt' ]
 
-class TransferFlightBook(Transfer):
+class TransferFlightBook (Transfer):
     Codes = [ 92, None ]
     RequiredProtocol = [ 'flightbook' ]
 
-class TransferLaps(Transfer):
+class TransferLaps (Transfer):
     Codes = [ 117, None ]
     RequiredProtocol = [ 'lap' ]
 
-class TransferWaypointCategories(Transfer):
+class TransferWaypointCategories (Transfer):
     Codes = [ 121, None ]
     RequiredProtocol = [ 'waypoint.category' ]
 
-class TransferRuns(Transfer):
+class TransferRuns (Transfer):
     Codes = [ 450, None ]
     RequiredProtocol = [ 'run' ]
 
-class TransferWorkouts(Transfer):
+class TransferWorkouts (Transfer):
     Codes = [ 451, None ]
     RequiredProtocol = [ 'workout' ]
 
-class TransferWorkoutOccurrences(Transfer):
+class TransferWorkoutOccurrences (Transfer):
     Codes = [ 452, None ]
     RequiredProtocol = [ 'workout.occurences' ]
 
-class TransferFitnessUserProfile(Transfer):
+class TransferFitnessUserProfile (Transfer):
     Codes = [ 453, None ]
     RequiredProtocol = [ 'fitness' ]
 
-class TransferWorkoutLimits(Transfer):
+class TransferWorkoutLimits (Transfer):
     Codes = [ 454, None ]
     RequiredProtocol = [ 'workout.limits' ]
 
-class TransferCourses(Transfer):
+class TransferCourses (Transfer):
     Codes = [ 561, None ]
     RequiredProtocol = [ 'course' ]
 
-class TransferCourseLaps(Transfer):
+class TransferCourseLaps (Transfer):
     Codes = [ 562, None ]
     RequiredProtocol = [ 'course.lap' ]
 
-class TransferCoursePoints(Transfer):
+class TransferCoursePoints (Transfer):
     Codes = [ 563, None ]
     RequiredProtocol = [ 'course.lap' ]
 
-class TransferCourseTracks(Transfer):
+class TransferCourseTracks (Transfer):
     Codes = [ 564, None ]
 
     def check_protocol_support( self, device ):
         return device.supports('track') or device.supports('course.track')
 
-class TransferCourseLimits(Transfer):
+class TransferCourseLimits (Transfer):
     Codes = [ 565, None ]
     RequiredProtocol = [ 'course.limits' ]

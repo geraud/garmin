@@ -1,7 +1,8 @@
-import struct, logging
+import struct, logging, datetime
 from garmin.usbio   import GarminUSB
 from garmin.packet  import *
 from garmin.utils   import Obj
+import garmin.command
 log = logging.getLogger('garmin.protocol')
 
 from garmin.utils import StructReader, hexdump
@@ -22,6 +23,9 @@ class USBPacketDevice( GarminUSB ):
                 return result
 
     def send_command (self, command):
+        if not isinstance(command,garmin.command.Base):
+            # intanciate the class
+            command = command()
         log.debug('Sending command: %s', command )
         packet = command.encode_for_device( self.get_protocols() )
         self.write_packet( packet )
@@ -42,6 +46,7 @@ class USBPacketDevice( GarminUSB ):
             , Packet.TRANSFER_COMPLETE      : 'ushort'
             , Packet.PRODUCT_DATA           : 'product_data'
             , Packet.EXTENDED_PRODUCT_DATA  : 'extended_product_data'
+            , Packet.FITNESS_USER_PROFILE   : 'fitness_user_profile'
             , Packet.RECORDS                : 'ushort'
             , Packet.RUN                    : 'run'
             , Packet.LAP                    : 'lap'
@@ -60,6 +65,39 @@ class USBPacketDevice( GarminUSB ):
 
     def d_ushort (self, sr):
         return sr.read('H')
+
+    def d_fitness_user_profile (self, sr):
+        log.debug('fitness user profile')
+        datatype = self.get_protocols().datatype('fitness')
+        log.debug('datatype: %d',datatype)
+        if datatype == 1004:
+            activities =  Obj()
+            for activity in [ 'running', 'biking', 'other' ]:
+                heart_rate_zones = []
+                for i in xrange(5):
+                    low,high = sr.read('BB 2x')
+                    heart_rate_zones.append( Obj(low = low, high = high) )
+
+                speed_zones = []
+                for i in xrange(10):
+                    low, high = sr.read('2f')
+                    name = sr.read('16s').split('\0')[0].strip()
+                    speed_zones.append( Obj( name = name, low = low, high = high) )
+
+                gear_weight, maximum_heart_rate = sr.read('f B 3x')
+
+                keys = ( 'heart_rate_zones', 'speed_zones', 'gear_weight','maximum_heart_rate' )
+                values = ( heart_rate_zones, speed_zones, gear_weight,maximum_heart_rate )
+                activities[ activity ] = Obj(zip(keys,values))
+
+            weight, birth_year, birth_month, birth_day, gender = sr.read('f H 3B')
+            birthdate = datetime.date( birth_year, birth_month, birth_day)
+
+            keys = ( 'activities', 'weight', 'birthdate', 'gender'  )
+            values = ( activities, weight, birthdate, gender  )
+            return Obj(zip(keys,values))
+        else:
+            raise ProtocolException, 'Cannot decode fitness user profilewith datatype [%d]' % datatype
 
     def d_run (self,sr):
         track_index, first_lap_index, last_lap_index = sr.read('3h')
@@ -96,26 +134,28 @@ class USBPacketDevice( GarminUSB ):
         return name,sport,steps[:valid_steps_counts]
 
     def d_track_header (self, sr):
-        log.debug('should decode track header %s', hexdump(sr.data) )
-        protocols = self.get_protocols()
-        datatype = protocols.datatype('track.header')
-
+        datatype = self.get_protocols().datatype('track.header')
         if datatype == 311:
             return sr.read('H')
-
         elif datatype in [ 310, 312 ]:
             display, color = sr.read('2B')
             identifier = sr.read_string()
             return Obj( display = display, color = color, identifier = identifier )
         else:
             raise ProtocolException, 'Cannot decode Track Header with datatype [%d]' % datatype
-        
-
         return None
 
     def d_track_data (self,sr):
-        # log.debug('should decode track data %s', hexdump(sr.data) )
-        return '.'
+        datatype = self.get_protocols().datatype('track.data')
+        if datatype == 304:
+            position = sr.read_position()
+            time = sr.read_time()
+            altitude, distance, heart_rate, cadence, sensor = sr.read('2f 3B')
+            keys =  [ 'position', 'time', 'altitude', 'distance', 'heart_rate', 'cadence', 'sensor' ]
+            values =  [ position, time, altitude, distance, heart_rate, cadence, sensor ]
+            return Obj(zip(keys,values))
+        else:
+            raise ProtocolException, 'Cannot decode Track point with datatype [%d]' % datatype
 
     def d_protocol_array (self, sr):
         physical = None

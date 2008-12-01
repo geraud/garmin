@@ -1,12 +1,12 @@
 import struct
 
-class UnexpectedPacketException(Exception):
+class UnexpectedPacketException (Exception):
     def __init__(self, packet_id):
         self.packet_id = packet_id
     def __repr__ (self):
         msg = 'Unexpected packet with id [%04x] (%d)'
         return msg % ( packet_id, packet_id )
-        
+
 
 class Packet:
 
@@ -25,7 +25,7 @@ class Packet:
     TRANSFER_RUNS               = 0x01C2
     RUN                         = 0X03DE
     LAP                         = 0x0095
-
+    FITNESS_USER_PROFILE        = 0x03E1
 
     def __init__ (self,data):
         self.protocol, self.id, payload_length = struct.unpack('<B3xH2xL',data[:12])

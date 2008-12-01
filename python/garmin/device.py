@@ -5,7 +5,7 @@ from garmin.utils       import *
 
 log = logging.getLogger('garmin.device')
 
-class Forerunner( USBPacketDevice ):
+class Forerunner (USBPacketDevice):
     VENDOR_ID =  0x091E
     PRODUCT_ID = 0x0003
 
@@ -18,45 +18,51 @@ class Forerunner( USBPacketDevice ):
         return self.protocols
 
     def start_session (self):
-        self.send_command( StartSession() )
+        self.send_command( StartSession )
         packet_id, device_id = self.read_response()
         if packet_id != Packet.SESSION_STARTED:
             raise UnexpectedPacketException(packet_id)
         self.device_id = device_id
 
     def get_device_capabilities (self):
-        self.send_command( GetDeviceDescription() )
+        self.send_command( GetDeviceDescription )
         return self.execute_reader( self.device_capabilities_reader() )
 
+    def get_fitness_profile (self):
+        self.send_command( TransferFitnessUserProfile )
+        packet_id, fitness_profile = self.read_response()
+        if packet_id != Packet.FITNESS_USER_PROFILE:
+            raise UnexpectedPacketException(packet_id)
+        log.debug('fitness_profile: %s', fitness_profile)
+        return fitness_profile
+
     def get_runs (self):
-        log.debug('Entering get_runs')
-        self.send_command( TransferRuns() )
+        #log.debug('Entering get_runs')
+        self.send_command( TransferRuns )
         runs = self.get_records( Packet.RUN )
         laps = self.get_laps()
         track_log = self.get_track_log()
-        log.debug('Leaving get_runs')
+        #log.debug('Leaving get_runs')
         return runs
 
     def get_laps (self):
-        log.debug('Entering get_laps')
-        self.send_command( TransferLaps() )
+        #log.debug('Entering get_laps')
+        self.send_command( TransferLaps )
         laps = self.get_records( Packet.LAP )
-        log.debug('Leaving get_laps')
+        #log.debug('Leaving get_laps')
         return laps
 
     def get_track_log (self):
-        log.debug('-'*80)
-        log.debug('Entering get_track_log')
-        self.send_command( TransferTrackLog() )
+        #log.debug('Entering get_track_log')
+        self.send_command( TransferTrackLog )
         logs = self.execute_reader( self.track_log_reader() )
-        log.debug('Leaving get_track_log')
+        #log.debug('Leaving get_track_log')
         return logs
 
     def get_records (self, expected_packet_id):
         return self.execute_reader( self.record_reader( expected_packet_id ) )
 
     def device_capabilities_reader (self):
-        log.debug('device_capabilities_reader')
         packet_id, product_info = yield
         if packet_id != Packet.PRODUCT_DATA:
             raise UnexpectedPacketException( packet_id )

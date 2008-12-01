@@ -1,7 +1,7 @@
 import struct, logging, datetime
 log = logging.getLogger('garmin.utils')
 
-class UTC(datetime.tzinfo):
+class UTC (datetime.tzinfo):
     def utcoffset(self, dt):
         return datetime.timedelta(0)
     def tzname(self, dt):
@@ -11,7 +11,7 @@ class UTC(datetime.tzinfo):
 
 GARMIN_EPOCH = datetime.datetime(1989, 12, 31, 0, 0, 0, 0, UTC() )
 
-class StructReaderException(Exception): pass
+class StructReaderException (Exception): pass
 
 class StructReader:
 
@@ -66,7 +66,7 @@ class StructReader:
     def __len__(self):
         return len(self.data)
 
-class Obj(dict):
+class Obj (dict):
     def __getattr__(self, attribute_name ):
         return self.__getitem__(attribute_name)
     def __setattr__(self, attribute_name, value ):
