@@ -37,27 +37,19 @@ class Forerunner (USBPacketDevice):
         return fitness_profile
 
     def get_runs (self):
-        #log.debug('Entering get_runs')
         self.send_command( TransferRuns )
         runs = self.get_records( Packet.RUN )
         laps = self.get_laps()
         track_log = self.get_track_log()
-        #log.debug('Leaving get_runs')
         return runs
 
     def get_laps (self):
-        #log.debug('Entering get_laps')
         self.send_command( TransferLaps )
-        laps = self.get_records( Packet.LAP )
-        #log.debug('Leaving get_laps')
-        return laps
+        return self.get_records( Packet.LAP )
 
     def get_track_log (self):
-        #log.debug('Entering get_track_log')
         self.send_command( TransferTrackLog )
-        logs = self.execute_reader( self.track_log_reader() )
-        #log.debug('Leaving get_track_log')
-        return logs
+        return self.execute_reader( self.track_log_reader() )
 
     def get_records (self, expected_packet_id):
         return self.execute_reader( self.record_reader( expected_packet_id ) )
