@@ -33,7 +33,6 @@ class Forerunner (USBPacketDevice):
         packet_id, fitness_profile = self.read_response()
         if packet_id != Packet.FITNESS_USER_PROFILE:
             raise UnexpectedPacketException(packet_id)
-        log.debug('fitness_profile: %s', fitness_profile)
         return fitness_profile
 
     def get_runs (self):

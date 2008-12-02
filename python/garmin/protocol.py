@@ -97,18 +97,24 @@ class USBPacketDevice( GarminUSB ):
             raise ProtocolException, 'Cannot decode fitness user profilewith datatype [%d]' % datatype
 
     def d_run (self,sr):
+        datatype = self.get_protocols().datatype('run')
+        if datatype != 1009:
+            raise ProtocolException, 'Cannot decode run with datatype [%d]' % datatype
         track_index, first_lap_index, last_lap_index = sr.read('3h')
-        sport, program, multisport = sr.read('3B 3x')
-        time,distance = sr.read('2L')
+        sport, program, multisport = sr.read('3B')
+        sr.skip('B H')
+        quick_wokrout = objectify( ( 'time', 'distance' ), sr.read('2L') )
         workout = self.d_workout(sr)
-        log.debug('workout: %s',workout)
-
-        keys = ( 'track_index', 'first_lap_index', 'last_lap_index', 'sport', 'program', 'multisport', 'time', 'distance', 'workout')
-        values = ( track_index, first_lap_index, last_lap_index, sport, program, multisport,time, distance, workout )
+        keys = ( 'track_index', 'first_lap_index', 'last_lap_index', 'sport', 'program', 'multisport', 'quick_wokrout', 'workout')
+        values = ( track_index, first_lap_index, last_lap_index, sport, program, multisport, quick_wokrout, workout )
         return objectify(keys,values)
 
     def d_lap (self,sr):
-        index = sr.read('H 2x')
+        datatype = self.get_protocols().datatype('lap')
+        if datatype not in [ 1011, 1015 ]:
+            raise ProtocolException, 'Cannot decode lap with datatype [%d]' % datatype
+        index = sr.read('H')
+        sr.skip('H')
         start_time = sr.read_time()
         duration, distance, max_speed  = sr.read('L 2f')
         begin = sr.read_position()
@@ -120,16 +126,17 @@ class USBPacketDevice( GarminUSB ):
         return objectify(keys,values)
 
     def d_workout (self,sr):
-        #datatype = self.get_protocols().datatype('workout'@)
-        #log.debug('datatype: %d', datatype)
+        datatype = self.get_protocols().datatype('workout')
+        if datatype != 1008:
+            raise ProtocolException, 'Cannot decode workout with datatype [%d]' % datatype
         valid_steps_counts = sr.read('L')
-        #log.debug('valid_steps_counts %d',valid_steps_counts)
         steps = []
         for i in xrange(20):
             keys = ( 'custom_name', 'target_custom_zone_low', 'target_custom_zone_high', 'duration_value', 'intensity', 'duration', 'target', 'target_value')
             custom_name = sr.read_fixed_string(16)
-            values = ( custom_name, ) + sr.read('2f H 4B 2x')
+            values = ( custom_name, ) + sr.read('2f H 4B')
             steps.append( objectify(keys,values) )
+            sr.skip('H')
         name = sr.read_fixed_string(16)
         sport = sr.read('B')
         return name,sport,steps[:valid_steps_counts]
@@ -143,26 +150,25 @@ class USBPacketDevice( GarminUSB ):
             identifier = sr.read_string()
             return Obj( display = display, color = color, identifier = identifier )
         else:
-            raise ProtocolException, 'Cannot decode Track Header with datatype [%d]' % datatype
-        return None
+            raise ProtocolException, 'Cannot decode track header with datatype [%d]' % datatype
 
     def d_track_data (self,sr):
         datatype = self.get_protocols().datatype('track.data')
-        if datatype == 304:
-            position = sr.read_position()
-            time = sr.read_time()
-            altitude, distance, heart_rate, cadence, sensor = sr.read('2f 3B')
-            keys = ( 'position', 'time', 'altitude', 'distance', 'heart_rate', 'cadence', 'sensor' )
-            values = ( position, time, altitude, distance, heart_rate, cadence, sensor )
-            return objectify(keys,values)
-        else:
-            raise ProtocolException, 'Cannot decode Track point with datatype [%d]' % datatype
+        if datatype != 304:
+            raise ProtocolException, 'Cannot decode track point with datatype [%d]' % datatype
+        position = sr.read_position()
+        time = sr.read_time()
+        altitude, distance, heart_rate, cadence, sensor = sr.read('2f 3B')
+        keys = ( 'position', 'time', 'altitude', 'distance', 'heart_rate', 'cadence', 'sensor' )
+        values = ( position, time, altitude, distance, heart_rate, cadence, sensor )
+        return objectify(keys,values)
 
     def d_protocol_array (self, sr):
         physical = None
         link = None
         protocols = {}
         last_protocol = None
+
         for i in range( len(sr)/3 ):
             tag, data = sr.read('c H')
             if tag == 'P':
