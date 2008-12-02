@@ -1,7 +1,7 @@
 import struct, logging, datetime
 from garmin.usbio   import GarminUSB
 from garmin.packet  import *
-from garmin.utils   import Obj
+from garmin.utils   import objectify, Obj
 import garmin.command
 log = logging.getLogger('garmin.protocol')
 
@@ -67,35 +67,32 @@ class USBPacketDevice( GarminUSB ):
         return sr.read('H')
 
     def d_fitness_user_profile (self, sr):
-        log.debug('fitness user profile')
         datatype = self.get_protocols().datatype('fitness')
-        log.debug('datatype: %d',datatype)
         if datatype == 1004:
             activities =  Obj()
             for activity in [ 'running', 'biking', 'other' ]:
                 heart_rate_zones = []
                 for i in xrange(5):
-                    low,high = sr.read('BB 2x')
+                    low, high = sr.read('2B 2x')
                     heart_rate_zones.append( Obj(low = low, high = high) )
 
                 speed_zones = []
                 for i in xrange(10):
                     low, high = sr.read('2f')
-                    name = sr.read('16s').split('\0')[0].strip()
+                    name = sr.read_fixed_string(16)
                     speed_zones.append( Obj( name = name, low = low, high = high) )
-
                 gear_weight, maximum_heart_rate = sr.read('f B 3x')
 
                 keys = ( 'heart_rate_zones', 'speed_zones', 'gear_weight','maximum_heart_rate' )
-                values = ( heart_rate_zones, speed_zones, gear_weight,maximum_heart_rate )
-                activities[ activity ] = Obj(zip(keys,values))
+                values = ( heart_rate_zones, speed_zones, gear_weight, maximum_heart_rate )
+                activities[ activity ] = objectify(keys,values)
 
             weight, birth_year, birth_month, birth_day, gender = sr.read('f H 3B')
             birthdate = datetime.date( birth_year, birth_month, birth_day)
 
-            keys = ( 'activities', 'weight', 'birthdate', 'gender'  )
-            values = ( activities, weight, birthdate, gender  )
-            return Obj(zip(keys,values))
+            keys = ( 'activities', 'weight', 'birthdate', 'gender' )
+            values = ( activities, weight, birthdate, gender )
+            return objectify(keys,values)
         else:
             raise ProtocolException, 'Cannot decode fitness user profilewith datatype [%d]' % datatype
 
@@ -104,10 +101,11 @@ class USBPacketDevice( GarminUSB ):
         sport, program, multisport = sr.read('3B 3x')
         time,distance = sr.read('2L')
         workout = self.d_workout(sr)
+        log.debug('workout: %s',workout)
 
-        keys = ( 'track_index', 'first_lap_index', 'last_lap_index', 'sport', 'program','multisport','time', 'distance', 'workout')
+        keys = ( 'track_index', 'first_lap_index', 'last_lap_index', 'sport', 'program', 'multisport', 'time', 'distance', 'workout')
         values = ( track_index, first_lap_index, last_lap_index, sport, program, multisport,time, distance, workout )
-        return Obj(zip(keys,values))
+        return objectify(keys,values)
 
     def d_lap (self,sr):
         index = sr.read('H 2x')
@@ -119,18 +117,21 @@ class USBPacketDevice( GarminUSB ):
 
         keys = ( 'index', 'start_time', 'duration', 'distance', 'max_speed', 'begin', 'end', 'calories', 'average_heart_rate', 'maximum_heart_rate', 'intensity', 'average_cadence', 'trigger_method' )
         values = ( index, start_time, duration, distance, max_speed, begin, end, calories, average_heart_rate, maximum_heart_rate, intensity, average_cadence, trigger_method )
-        return Obj(zip(keys,values))
+        return objectify(keys,values)
 
     def d_workout (self,sr):
+        #datatype = self.get_protocols().datatype('workout'@)
+        #log.debug('datatype: %d', datatype)
         valid_steps_counts = sr.read('L')
+        #log.debug('valid_steps_counts %d',valid_steps_counts)
         steps = []
         for i in xrange(20):
-            keys = [ 'custom_name','target_custom_zone_low','target_custom_zone_high'
-                    ,'duration_value','intensity','duration','target'
-                    ,'target_value']
-            values = sr.read('16s 2f H 4B 2x')
-            steps.append( Obj(zip(keys,values)) )
-        name, sport =  sr.read('16s B')
+            keys = ( 'custom_name', 'target_custom_zone_low', 'target_custom_zone_high', 'duration_value', 'intensity', 'duration', 'target', 'target_value')
+            custom_name = sr.read_fixed_string(16)
+            values = ( custom_name, ) + sr.read('2f H 4B 2x')
+            steps.append( objectify(keys,values) )
+        name = sr.read_fixed_string(16)
+        sport = sr.read('B')
         return name,sport,steps[:valid_steps_counts]
 
     def d_track_header (self, sr):
@@ -151,9 +152,9 @@ class USBPacketDevice( GarminUSB ):
             position = sr.read_position()
             time = sr.read_time()
             altitude, distance, heart_rate, cadence, sensor = sr.read('2f 3B')
-            keys =  [ 'position', 'time', 'altitude', 'distance', 'heart_rate', 'cadence', 'sensor' ]
-            values =  [ position, time, altitude, distance, heart_rate, cadence, sensor ]
-            return Obj(zip(keys,values))
+            keys = ( 'position', 'time', 'altitude', 'distance', 'heart_rate', 'cadence', 'sensor' )
+            values = ( position, time, altitude, distance, heart_rate, cadence, sensor )
+            return objectify(keys,values)
         else:
             raise ProtocolException, 'Cannot decode Track point with datatype [%d]' % datatype
 

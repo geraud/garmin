@@ -22,7 +22,7 @@ def main():
         dev.get_device_capabilities()
         # log.debug("device : %s",dev)
         # log.debug('protocols: %s', dev.protocols)
-        # dev.get_runs()
+        dev.get_runs()
         dev.get_fitness_profile()
 
     finally:
