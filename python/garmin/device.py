@@ -40,9 +40,6 @@ class Forerunner (USBPacketDevice):
     def get_workouts (self):
         self.send_command( TransferWorkouts )
         workouts = self.get_records(Packet.WORKOUT)
-        for workout in workouts:
-            log.debug('\n'*5)
-            log.debug('workout: %s', workout)
         workout_occurences = self.get_workout_occurences()
         return workouts, workout_occurences
 
