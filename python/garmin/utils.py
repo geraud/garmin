@@ -11,7 +11,7 @@ class UTC (datetime.tzinfo):
 
 GARMIN_EPOCH = datetime.datetime(1989, 12, 31, 0, 0, 0, 0, UTC() )
 
-ASCII_FILTER = ''.join( [ chr(i) in ( '-. ' + string.digits + string.ascii_letters) and chr(i) or ' ' for i in range(256)] )
+ASCII_FILTER = ''.join( [ chr(i) in ( '[]()/+-. ' + string.digits + string.ascii_letters) and chr(i) or ' ' for i in range(256)] )
 
 class StructReaderException (Exception): pass
 

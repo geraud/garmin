@@ -17,17 +17,24 @@ class Packet:
     TRANSFER_COMPLETE           = 0x000C
     DATE_TIME                   = 0x000E
     RECORDS                     = 0x001B
+    ALMANAC_DATA                = 0x001F
     TRACK_DATA                  = 0x0022
     TRACK_HEADER                = 0x0063
+    LAP                         = 0x0095
+    EXTENDED_PRODUCT_DATA       = 0x00F8
     PROTOCOL_ARRAY              = 0x00FD
     PRODUCT_DATA                = 0x00FF
-    EXTENDED_PRODUCT_DATA       = 0x00F8
     TRANSFER_RUNS               = 0x01C2
     RUN                         = 0X03DE
     WORKOUT                     = 0x03DF
     WORKOUT_OCCURRENCE          = 0x03E0
-    LAP                         = 0x0095
     FITNESS_USER_PROFILE        = 0x03E1
+    COURSE                      = 0x0425
+    COURSE_LAP                  = 0x0426
+    COURSE_POINT                = 0x0427
+    COURSE_TRACK_HEADER         = 0x0428
+    COURSE_TRACK_DATA           = 0x0429
+    COURSE_LIMITS               = 0x042A
 
     def __init__ (self,data):
         self.protocol, self.id, payload_length = struct.unpack('<B3xH2xL',data[:12])
@@ -46,7 +53,6 @@ class Packet:
 
         msg = "<Packet protocol: %s, id: %04X, length: %s, payload: %s>"
         return msg % ( type_name, self.id, len(self.payload), hexdump(self.payload) )
-
 
     @staticmethod
     def encode_usb( packet_id, payload = None):

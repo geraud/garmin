@@ -19,10 +19,7 @@ class Forerunner (USBPacketDevice):
 
     def start_session (self):
         self.send_command( StartSession )
-        packet_id, device_id = self.read_response()
-        if packet_id != Packet.SESSION_STARTED:
-            raise UnexpectedPacketException(packet_id)
-        self.device_id = device_id
+        self.device_id = self.get_single_record(Packet.SESSION_STARTED)
 
     def get_device_capabilities (self):
         self.send_command( GetDeviceDescription )
@@ -30,17 +27,15 @@ class Forerunner (USBPacketDevice):
 
     def get_fitness_profile (self):
         self.send_command( TransferFitnessUserProfile )
-        packet_id, fitness_profile = self.read_response()
-        if packet_id != Packet.FITNESS_USER_PROFILE:
-            raise UnexpectedPacketException(packet_id)
-        return fitness_profile
+        return self.get_single_record(Packet.FITNESS_USER_PROFILE)
 
     def get_time (self):
         self.send_command( TransferTime )
-        packet_id, device_time = self.read_response()
-        if packet_id != Packet.DATE_TIME:
-            raise UnexpectedPacketException(packet_id)
-        return device_time
+        return self.get_single_record(Packet.DATE_TIME)
+
+    def get_almanac (self):
+        self.send_command( TransferAlmanac )
+        return self.get_records(Packet.ALMANAC_DATA)
 
     def get_workouts (self):
         self.send_command( TransferWorkouts )
@@ -48,10 +43,19 @@ class Forerunner (USBPacketDevice):
         for workout in workouts:
             log.debug('\n'*5)
             log.debug('workout: %s', workout)
-
-        self.send_command( TransferWorkoutOccurrences )
-        workout_occurences = self.get_records(Packet.WORKOUT_OCCURRENCE)
+        workout_occurences = self.get_workout_occurences()
         return workouts, workout_occurences
+
+    def get_workout_occurences (self):
+        self.send_command( TransferWorkoutOccurrences )
+        return self.get_records(Packet.WORKOUT_OCCURRENCE)
+
+    def get_course_limits (self):
+        self.send_command( TransferCourseLimits )
+        return self.get_single_record( Packet.COURSE_LIMITS )
+
+    def get_courses (self):
+        self.send_command( TransferCourses )
 
     def get_runs (self):
         self.send_command( TransferRuns )
@@ -68,13 +72,19 @@ class Forerunner (USBPacketDevice):
         self.send_command( TransferTrackLog )
         return self.execute_reader( self.track_log_reader() )
 
+    def get_single_record (self, expected_packet_id):
+        packet_id, response = self.read_response()
+        if packet_id != expected_packet_id:
+            raise UnexpectedPacketException(packet_id)
+        return response
+
     def get_records (self, expected_packet_id):
         return self.execute_reader( self.record_reader( expected_packet_id ) )
 
     def device_capabilities_reader (self):
         packet_id, product_info = yield
         if packet_id != Packet.PRODUCT_DATA:
-            raise UnexpectedPacketException( packet_id )
+            raise UnexpectedPacketException(packet_id)
         self.product_info = product_info
         self.extended_product_info = []
 
@@ -94,17 +104,17 @@ class Forerunner (USBPacketDevice):
         records = []
         packet_id, record_count = yield
         if packet_id != Packet.RECORDS:
-            raise UnexpectedPacketException( packet_id )
+            raise UnexpectedPacketException(packet_id)
 
         for i in xrange(record_count):
             packet_id, record = yield
             if packet_id != expected_packet_id:
-                raise UnexpectedPacketException( packet_id )
+                raise UnexpectedPacketException(packet_id)
             records.append( record )
 
         packet_id, ignored_value = yield
         if packet_id != Packet.TRANSFER_COMPLETE:
-            raise UnexpectedPacketException( packet_id )
+            raise UnexpectedPacketException(packet_id)
 
         yield records
 
@@ -112,7 +122,7 @@ class Forerunner (USBPacketDevice):
         records = []
         packet_id, record_count = yield
         if packet_id != Packet.RECORDS:
-            raise UnexpectedPacketException( packet_id )
+            raise UnexpectedPacketException(packet_id)
 
         last_track = Obj( header = None, data = [] )
         for i in xrange(record_count ):
@@ -124,11 +134,11 @@ class Forerunner (USBPacketDevice):
             elif packet_id == Packet.TRACK_DATA:
                 last_track.data.extend( data )
             else:
-                raise UnexpectedPacketException( packet_id )
+                raise UnexpectedPacketException(packet_id)
 
         packet_id, ignored_value = yield
         if packet_id != Packet.TRANSFER_COMPLETE:
-            raise UnexpectedPacketException( packet_id )
+            raise UnexpectedPacketException(packet_id)
 
         yield records
 

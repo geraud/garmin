@@ -20,10 +20,16 @@ def main():
     try:
         dev.start_session()
         dev.get_device_capabilities()
+        res = dev.get_course_limits()
+        log.debug('res: %s', res )
+
         dev.get_fitness_profile()
         dev.get_workouts()
         dev.get_time()
-        #dev.get_runs()
+        almanac = dev.get_almanac()
+        log.debug('found %d almanac', len(almanac))
+        runs = dev.get_runs()
+        log.debug('found %d runs', len(runs[0]))
     finally:
         dev.close()
 
