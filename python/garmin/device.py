@@ -35,9 +35,34 @@ class Forerunner (USBPacketDevice):
             raise UnexpectedPacketException(packet_id)
         return fitness_profile
 
+    def get_time (self):
+        self.send_command( TransferTime )
+        packet_id, device_time = self.read_response()
+        if packet_id != Packet.DATE_TIME:
+            raise UnexpectedPacketException(packet_id)
+        return device_time
+
+    def get_workouts (self):
+        self.send_command( TransferWorkouts )
+        workouts = self.get_records(Packet.WORKOUT)
+        for workout in workouts:
+            log.debug('\n'*5)
+            log.debug('workout: %s', workout)
+
+        self.send_command( TransferWorkoutOccurrences )
+        workout_occurences = self.get_records(Packet.WORKOUT_OCCURRENCE)
+        log.debug( '---> %s', self.protocols.datatype('workout.occurrence') )
+        for workout_occurence in workout_occurences:
+            log.debug( '\n'*5)
+            log.debug('workout_occurence: %d', workout_occurence)
+        log.debug('bye')
+        return workouts
+
     def get_runs (self):
         self.send_command( TransferRuns )
         runs = self.get_records( Packet.RUN )
+        for run in runs:
+            log.debug('run %s', run)
         laps = self.get_laps()
         track_log = self.get_track_log()
         return runs

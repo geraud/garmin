@@ -114,7 +114,7 @@ class TransferWorkouts (Transfer):
 
 class TransferWorkoutOccurrences (Transfer):
     Codes = [ 452, None ]
-    RequiredProtocol = [ 'workout.occurences' ]
+    RequiredProtocol = [ 'workout.occurrence' ]
 
 class TransferFitnessUserProfile (Transfer):
     Codes = [ 453, None ]

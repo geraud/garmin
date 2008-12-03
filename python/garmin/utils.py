@@ -62,11 +62,6 @@ class StructReader:
     def eof(self):
         return self.index >= len(self.data)
 
-    def skip (self, format ):
-        count = struct.calcsize(format)
-        self.index += count
-        return count
-
     def size (self):
         return len(self.data) - self.index
 

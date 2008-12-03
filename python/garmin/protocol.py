@@ -1,7 +1,7 @@
 import struct, logging, datetime
 from garmin.usbio   import GarminUSB
 from garmin.packet  import *
-from garmin.utils   import objectify, Obj
+from garmin.utils   import objectify, Obj, UTC
 import garmin.command
 log = logging.getLogger('garmin.protocol')
 
@@ -9,6 +9,12 @@ from garmin.utils import StructReader, hexdump
 
 class ProtocolException(Exception): pass
 
+class UnsupportedDatatypeExecption (ProtocolException):
+    def __init__(self, datatype):
+        self.datatype = datatype
+    def __str__ (self):
+        msg = 'Unsupported datatype [%04X] (%d)'
+        return msg % ( self.datatype, self.datatype )
 
 class USBPacketDevice( GarminUSB ):
 
@@ -42,6 +48,7 @@ class USBPacketDevice( GarminUSB ):
         decoder = {
             0 : None
             , Packet.SESSION_STARTED        : 'ulong'
+            , Packet.DATE_TIME              : 'date_time'
             , Packet.PROTOCOL_ARRAY         : 'protocol_array'
             , Packet.TRANSFER_COMPLETE      : 'ushort'
             , Packet.PRODUCT_DATA           : 'product_data'
@@ -50,6 +57,8 @@ class USBPacketDevice( GarminUSB ):
             , Packet.RECORDS                : 'ushort'
             , Packet.RUN                    : 'run'
             , Packet.LAP                    : 'lap'
+            , Packet.WORKOUT                : 'workout'
+            , Packet.WORKOUT_OCCURRENCE     : 'workout_occurrence'
             , Packet.TRACK_HEADER           : 'track_header'
             , Packet.TRACK_DATA             : 'track_data'
         }.get( packet.id, None )
@@ -66,6 +75,13 @@ class USBPacketDevice( GarminUSB ):
     def d_ushort (self, sr):
         return sr.read('H')
 
+    def d_date_time (self, sr):
+        datatype = self.get_protocols().datatype('date_time')
+        if datatype != 600:
+            raise UnsupportedDatatypeExecption(datatype)
+        month, day, year, hour, minute, second = sr.read('2B 2H 2B')
+        return datetime.datetime( year, month, day, hour, minute, second, 0, UTC() )
+
     def d_fitness_user_profile (self, sr):
         datatype = self.get_protocols().datatype('fitness')
         if datatype == 1004:
@@ -73,17 +89,14 @@ class USBPacketDevice( GarminUSB ):
             for activity in [ 'running', 'biking', 'other' ]:
                 heart_rate_zones = []
                 for i in xrange(5):
-                    low, high = sr.read('2B')
-                    sr.skip('H')
+                    low, high = sr.read('2B 2x')
                     heart_rate_zones.append( Obj(low = low, high = high) )
                 speed_zones = []
                 for i in xrange(10):
                     low, high = sr.read('2f')
                     name = sr.read_fixed_string(16)
                     speed_zones.append( Obj( name = name, low = low, high = high) )
-                gear_weight, maximum_heart_rate = sr.read('f B')
-                sr.skip('B H')
-
+                gear_weight, maximum_heart_rate = sr.read('f B 3x')
                 keys = ( 'heart_rate_zones', 'speed_zones', 'gear_weight','maximum_heart_rate' )
                 values = ( heart_rate_zones, speed_zones, gear_weight, maximum_heart_rate )
                 activities[ activity ] = objectify(keys,values)
@@ -97,25 +110,23 @@ class USBPacketDevice( GarminUSB ):
         else:
             raise ProtocolException, 'Cannot decode fitness user profilewith datatype [%d]' % datatype
 
-    def d_run (self,sr):
+    def d_run (self, sr):
         datatype = self.get_protocols().datatype('run')
         if datatype != 1009:
-            raise ProtocolException, 'Cannot decode run with datatype [%d]' % datatype
-        track_index, first_lap_index, last_lap_index = sr.read('3h')
-        sport, program, multisport = sr.read('3B')
-        sr.skip('B H')
-        quick_wokrout = objectify( ( 'time', 'distance' ), sr.read('2L') )
-        workout = self.d_workout(sr)
+            raise UnsupportedDatatypeExecption(datatype)
+        track_index, first_lap_index, last_lap_index = sr.read('3H')
+        sport, program, multisport = sr.read('3B 3x')
+        quick_wokrout = objectify( ( 'time', 'distance' ), sr.read('L f') )
+        workout = self.d_workout(sr, forced_datatype = 1008)
         keys = ( 'track_index', 'first_lap_index', 'last_lap_index', 'sport', 'program', 'multisport', 'quick_wokrout', 'workout')
         values = ( track_index, first_lap_index, last_lap_index, sport, program, multisport, quick_wokrout, workout )
         return objectify(keys,values)
 
-    def d_lap (self,sr):
+    def d_lap (self, sr):
         datatype = self.get_protocols().datatype('lap')
         if datatype not in [ 1011, 1015 ]:
-            raise ProtocolException, 'Cannot decode lap with datatype [%d]' % datatype
-        index = sr.read('H')
-        sr.skip('H')
+            raise UnsupportedDatatypeExecption(datatype)
+        index = sr.read('H 2x')
         start_time = sr.read_time()
         duration, distance, max_speed  = sr.read('L 2f')
         begin = sr.read_position()
@@ -126,21 +137,28 @@ class USBPacketDevice( GarminUSB ):
         values = ( index, start_time, duration, distance, max_speed, begin, end, calories, average_heart_rate, maximum_heart_rate, intensity, average_cadence, trigger_method )
         return objectify(keys,values)
 
-    def d_workout (self,sr):
-        datatype = self.get_protocols().datatype('workout')
+    def d_workout (self, sr, forced_datatype= None):
+        datatype = forced_datatype or self.get_protocols().datatype('workout')
         if datatype != 1008:
-            raise ProtocolException, 'Cannot decode workout with datatype [%d]' % datatype
+            raise UnsupportedDatatypeExecption(datatype)
         valid_steps_counts = sr.read('L')
         steps = []
         for i in xrange(20):
             keys = ( 'custom_name', 'target_custom_zone_low', 'target_custom_zone_high', 'duration_value', 'intensity', 'duration', 'target', 'target_value')
             custom_name = sr.read_fixed_string(16)
-            values = ( custom_name, ) + sr.read('2f H 4B')
+            values = ( custom_name, ) + sr.read('2f H 4B 2x')
             steps.append( objectify(keys,values) )
-            sr.skip('H')
         name = sr.read_fixed_string(16)
         sport = sr.read('B')
-        return name,sport,steps[:valid_steps_counts]
+        return name, sport, steps[:valid_steps_counts]
+
+    def d_workout_occurrence(self, sr):
+        datatype = self.get_protocols().datatype('workout.occurrence')
+        if datatype != 1003:
+            raise UnsupportedDatatypeExecption(datatype)
+        workout_name = sr.read_fixed_string(16)
+        day = sr.read_time()
+        return Obj( workout_name = workout_name, day = day )
 
     def d_track_header (self, sr):
         datatype = self.get_protocols().datatype('track.header')
@@ -151,12 +169,12 @@ class USBPacketDevice( GarminUSB ):
             identifier = sr.read_string()
             return Obj( display = display, color = color, identifier = identifier )
         else:
-            raise ProtocolException, 'Cannot decode track header with datatype [%d]' % datatype
+            raise UnsupportedDatatypeExecption(datatype)
 
     def d_track_data (self,sr):
         datatype = self.get_protocols().datatype('track.data')
         if datatype != 304:
-            raise ProtocolException, 'Cannot decode track point with datatype [%d]' % datatype
+            raise UnsupportedDatatypeExecption(datatype)
         position = sr.read_position()
         time = sr.read_time()
         altitude, distance, heart_rate, cadence, sensor = sr.read('2f 3B')
@@ -214,7 +232,7 @@ class ProtocolManager:
         , 906: [ 'lap', 'lap' ]
         ,1000: [ 'run', 'run' ]
         ,1002: [ 'workout', 'workout' ]
-        ,1003: [ 'workout.occurrences', 'workout.occurrences' ]
+        ,1003: [ 'workout.occurrence', 'workout.occurrence' ]
         ,1004: [ 'fitness', 'fitness' ]
         ,1005: [ 'workout.limits', 'workout.limits' ]
         ,1006: [ 'course', 'course' ]

@@ -1,7 +1,7 @@
 #!/usr/bin/python
-import os, sys, array, logging
+import logging
 
-from garmin.device import *
+from garmin.device import Forerunner
 
 log = logging.getLogger('main')
 
@@ -20,13 +20,15 @@ def main():
     try:
         dev.start_session()
         dev.get_device_capabilities()
-        # log.debug("device : %s",dev)
-        # log.debug('protocols: %s', dev.protocols)
-        dev.get_runs()
         dev.get_fitness_profile()
-
+        dev.get_workouts()
+        dev.get_time()
+        #dev.get_runs()
     finally:
         dev.close()
 
 if __name__=='__main__':
-    main()
+    try:
+        main()
+    except Exception,ex:
+        log.exception(ex)

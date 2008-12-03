@@ -3,10 +3,9 @@ import struct
 class UnexpectedPacketException (Exception):
     def __init__(self, packet_id):
         self.packet_id = packet_id
-    def __repr__ (self):
-        msg = 'Unexpected packet with id [%04x] (%d)'
-        return msg % ( packet_id, packet_id )
-
+    def __str__ (self):
+        msg = 'Unexpected packet with id [%04X] (%d)'
+        return msg % ( self.packet_id, self.packet_id )
 
 class Packet:
 
@@ -16,6 +15,7 @@ class Packet:
     SESSION_STARTED             = 0x0006
     # Basic Link Information
     TRANSFER_COMPLETE           = 0x000C
+    DATE_TIME                   = 0x000E
     RECORDS                     = 0x001B
     TRACK_DATA                  = 0x0022
     TRACK_HEADER                = 0x0063
@@ -24,6 +24,8 @@ class Packet:
     EXTENDED_PRODUCT_DATA       = 0x00F8
     TRANSFER_RUNS               = 0x01C2
     RUN                         = 0X03DE
+    WORKOUT                     = 0x03DF
+    WORKOUT_OCCURRENCE          = 0x03E0
     LAP                         = 0x0095
     FITNESS_USER_PROFILE        = 0x03E1
 
