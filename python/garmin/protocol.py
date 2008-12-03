@@ -73,15 +73,16 @@ class USBPacketDevice( GarminUSB ):
             for activity in [ 'running', 'biking', 'other' ]:
                 heart_rate_zones = []
                 for i in xrange(5):
-                    low, high = sr.read('2B 2x')
+                    low, high = sr.read('2B')
+                    sr.skip('H')
                     heart_rate_zones.append( Obj(low = low, high = high) )
-
                 speed_zones = []
                 for i in xrange(10):
                     low, high = sr.read('2f')
                     name = sr.read_fixed_string(16)
                     speed_zones.append( Obj( name = name, low = low, high = high) )
-                gear_weight, maximum_heart_rate = sr.read('f B 3x')
+                gear_weight, maximum_heart_rate = sr.read('f B')
+                sr.skip('B H')
 
                 keys = ( 'heart_rate_zones', 'speed_zones', 'gear_weight','maximum_heart_rate' )
                 values = ( heart_rate_zones, speed_zones, gear_weight, maximum_heart_rate )
