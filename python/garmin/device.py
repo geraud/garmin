@@ -52,10 +52,15 @@ class Forerunner (USBPacketDevice):
 
     def get_course_limits (self):
         self.send_command( TransferCourseLimits )
-        return self.get_single_record( Packet.COURSE_LIMITS )
+        return self.get_single_record(Packet.COURSE_LIMITS)
 
     def get_courses (self):
         self.send_command( TransferCourses )
+        return self.get_records(Packet.COURSE)
+
+    def get_course_laps (self):
+        self.send_command( TransferCourseLaps )
+        return self.get_records(Packet.COURSE_LAP)
 
     def get_runs (self):
         self.send_command( TransferRuns )

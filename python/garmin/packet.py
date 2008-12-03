@@ -37,7 +37,7 @@ class Packet:
     COURSE_LIMITS               = 0x042A
 
     def __init__ (self,data):
-        self.protocol, self.id, payload_length = struct.unpack('<B3xH2xL',data[:12])
+        self.protocol, self.id, payload_length = struct.unpack_from('<B 3x H 2x L',data)
         self.payload = data[12:]
         if len(self.payload) != payload_length:
             raise ProtocolException, 'Incorrect payload length'
@@ -64,11 +64,8 @@ class Packet:
 
     @staticmethod
     def encode_packet (protocol, packet_id, payload = None ):
-        message = struct.pack('<B3xH2xL', protocol, packet_id, len(payload or '') )
+        message = struct.pack('<B 3x H 2x L', protocol, packet_id, len(payload or '') )
         if payload is not None:
             message += payload
         return message
 
-    @staticmethod
-    def dump ( data ):
-        return ''.join( map( lambda x: '\\x%02x' % ord(x), data) )

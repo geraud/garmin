@@ -131,15 +131,15 @@ class USBPacketDevice( GarminUSB ):
 
     def d_lap (self, sr):
         datatype = self.datatype_for('lap', 1011, 1015)
-        index = sr.read('H 2x')
-        start_time = sr.read_time()
-        duration, distance, max_speed  = sr.read('L 2f')
-        begin = sr.read_position()
-        end = sr.read_position()
-        calories, average_heart_rate, maximum_heart_rate, intensity, average_cadence, trigger_method = sr.read('H 5B')
-
+        # index = sr.read('H 2x')
+        # start_time = sr.read_time()
+        # duration, distance, max_speed  = sr.read('L 2f')
+        # begin = sr.read_position()
+        # end = sr.read_position()
+        # calories, average_heart_rate, maximum_heart_rate, intensity, average_cadence, trigger_method = sr.read('H 5B')
+        #( index, start_time, duration, distance, max_speed, begin, end, calories, average_heart_rate, maximum_heart_rate, intensity, average_cadence, trigger_method )
         keys = ( 'index', 'start_time', 'duration', 'distance', 'max_speed', 'begin', 'end', 'calories', 'average_heart_rate', 'maximum_heart_rate', 'intensity', 'average_cadence', 'trigger_method' )
-        values = ( index, start_time, duration, distance, max_speed, begin, end, calories, average_heart_rate, maximum_heart_rate, intensity, average_cadence, trigger_method )
+        values = sr.read('H 2x') + (sr.read_time(),) +  sr.read('L 2f') + ( sr.read_position(), sr.read_position() ) + sr.read('H 5B')
         return objectify(keys,values)
 
     def d_workout (self, sr, forced_datatype= None):
@@ -166,20 +166,16 @@ class USBPacketDevice( GarminUSB ):
         if datatype == 311:
             return sr.read('H')
         elif datatype in [ 310, 312 ]:
-            display, color = sr.read('2B')
-            identifier = sr.read_string()
-            return Obj( display = display, color = color, identifier = identifier )
+            keys = ('display', 'color', 'identifier' )
+            values = sr.read('2B') + ( sr.read_string(), )
+            return objectify(keys,values)
         else:
             raise UnsupportedDatatypeExecption(datatype)
 
     def d_track_data (self,sr):
         datatype = self.datatype_for('track.data', 304)
-
-        position = sr.read_position()
-        time = sr.read_time()
-        altitude, distance, heart_rate, cadence, sensor = sr.read('2f 3B')
         keys = ( 'position', 'time', 'altitude', 'distance', 'heart_rate', 'cadence', 'sensor' )
-        values = ( position, time, altitude, distance, heart_rate, cadence, sensor )
+        values = ( sr.read_position(), sr.read_time() ) + sr.read('2f 3B')
         return objectify(keys,values)
 
     def d_almanac_data (self, sr):
@@ -189,13 +185,20 @@ class USBPacketDevice( GarminUSB ):
 
 
     def d_course (self, sr):
-        datatype = self.datatype_for('course',0)
+        datatype = self.datatype_for('course', 1006)
+        result = Obj()
+        result.index = sr.read('H 2x')
+        result.course_name = sr.read_fixed_string(16)
+        return result
 
     def d_course_point (self, sr):
         datatype = self.datatype_for('course.point',0)
 
     def d_course_lap (self, sr):
-        datatype = self.datatype_for('course.lap',0)
+        datatype = self.datatype_for('course.lap', 1007)
+        keys = ( 'course_index', 'lap_index', 'total_time', 'total_distance', 'begin', 'end', 'average_heart_rate', 'maximum_heart_rate', 'intensity', 'average_cadence' )
+        values = sr.read('2H L f') + (sr.read_position(), sr.read_position()) + sr.read('4B')
+        return objectify(keys,values)
 
     def d_course_track_header (self, sr):
         datatype = self.datatype_for('course.track.header',0)
@@ -205,7 +208,7 @@ class USBPacketDevice( GarminUSB ):
 
     def d_course_limits (self, sr):
         dataype = self.datatype_for('course.limits', 1013)
-        keys = ('max_courses','max_course_laps','max_course_points','max_course_track_poins')
+        keys = ( 'max_courses', 'max_course_laps', 'max_course_points', 'max_course_track_poins' )
         return objectify(keys,sr.read('4L'))
 
 
