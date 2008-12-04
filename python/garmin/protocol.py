@@ -269,9 +269,8 @@ class ProtocolManager:
         for proto_code, proto_values in protocols.items():
             names = self.DECODED_NAMES.get(proto_code,None)
             if names is None:
-                log.warning('Unknown protocol [%04X] (%d) values %s', proto_code, proto_code, proto_values)
+                #log.warning('Unknown protocol [%04X] (%d) values %s', proto_code, proto_code, proto_values)
                 continue
-            log.info('Registering protocol %d [%s] values %s',proto_code,names[0],proto_values)
             self.protocols['protocol.%s' % names[0]] = proto_code
             for index, value_name in enumerate(names[1:]):
                 self.protocols['datatype.%s' % value_name] = proto_values[ index ]
