@@ -25,6 +25,9 @@ class Forerunner (USBPacketDevice):
         self.send_command( GetDeviceDescription )
         return self.execute_reader( self.device_capabilities_reader() )
 
+    def turn_off (self):
+        self.send_command( PowerOff )
+
     def get_fitness_profile (self):
         self.send_command( TransferFitnessUserProfile )
         return self.get_single_record(Packet.FITNESS_USER_PROFILE)

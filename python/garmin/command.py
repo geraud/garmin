@@ -83,6 +83,7 @@ class TransferWaypoints (Transfer):
 
 class PowerOff (Base):
     Codes = [ 8, 26 ]
+    RequiredProtocol= []
 
 class StartPVTDownload (Base):
     Codes = [ 49, None ]
