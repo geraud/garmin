@@ -131,15 +131,8 @@ class USBPacketDevice( GarminUSB ):
 
     def d_lap (self, sr):
         datatype = self.datatype_for('lap', 1011, 1015)
-        # index = sr.read('H 2x')
-        # start_time = sr.read_time()
-        # duration, distance, max_speed  = sr.read('L 2f')
-        # begin = sr.read_position()
-        # end = sr.read_position()
-        # calories, average_heart_rate, maximum_heart_rate, intensity, average_cadence, trigger_method = sr.read('H 5B')
-        #( index, start_time, duration, distance, max_speed, begin, end, calories, average_heart_rate, maximum_heart_rate, intensity, average_cadence, trigger_method )
         keys = ( 'index', 'start_time', 'duration', 'distance', 'max_speed', 'begin', 'end', 'calories', 'average_heart_rate', 'maximum_heart_rate', 'intensity', 'average_cadence', 'trigger_method' )
-        values = sr.read('H 2x') + (sr.read_time(),) +  sr.read('L 2f') + ( sr.read_position(), sr.read_position() ) + sr.read('H 5B')
+        values = ( sr.read('H 2x') , sr.read_time() ) +  sr.read('L 2f') + ( sr.read_position(), sr.read_position() ) + sr.read('H 5B')
         return objectify(keys,values)
 
     def d_workout (self, sr, forced_datatype= None):
@@ -148,8 +141,7 @@ class USBPacketDevice( GarminUSB ):
         steps = []
         for i in xrange(20):
             keys = ( 'custom_name', 'target_custom_zone_low', 'target_custom_zone_high', 'duration_value', 'intensity', 'duration', 'target', 'target_value')
-            custom_name = sr.read_fixed_string(16)
-            values = ( custom_name, ) + sr.read('2f H 4B 2x')
+            values = ( sr.read_fixed_string(16), ) + sr.read('2f H 4B 2x')
             steps.append( objectify(keys,values) )
         name = sr.read_fixed_string(16)
         sport = sr.read('B')
@@ -169,8 +161,6 @@ class USBPacketDevice( GarminUSB ):
             keys = ('display', 'color', 'identifier' )
             values = sr.read('2B') + ( sr.read_string(), )
             return objectify(keys,values)
-        else:
-            raise UnsupportedDatatypeExecption(datatype)
 
     def d_track_data (self,sr):
         datatype = self.datatype_for('track.data', 304)
@@ -182,7 +172,6 @@ class USBPacketDevice( GarminUSB ):
         datatype = self.datatype_for('almanac', 501)
         keys = ( 'week_number', 'af0', 'af1', 'eccentricity', 'sqrta', 'm0', 'w', 'omg0', 'odot', 'inclination', 'health' )
         return objectify(keys,sr.read('H 10f B'))
-
 
     def d_course (self, sr):
         datatype = self.datatype_for('course', 1006)
@@ -201,16 +190,19 @@ class USBPacketDevice( GarminUSB ):
         return objectify(keys,values)
 
     def d_course_track_header (self, sr):
-        datatype = self.datatype_for('course.track.header',0)
+        if self.get_protocols().has_datatype('course.track.header'):
+            raise NotImplementd, 'course track header is not implemeted'
+        return self.d_track_header(sr)
 
     def d_course_track_data (self, sr):
-        datatype = self.datatype_for('course.track.data',0)
+        if self.get_protocols().has_datatype('course.track.data'):
+            raise NotImplementd, 'course track data is not implemeted'
+        return self.d_track_data(sr)
 
     def d_course_limits (self, sr):
         dataype = self.datatype_for('course.limits', 1013)
         keys = ( 'max_courses', 'max_course_laps', 'max_course_points', 'max_course_track_poins' )
         return objectify(keys,sr.read('4L'))
-
 
     def d_protocol_array (self, sr):
         physical = None
@@ -277,7 +269,9 @@ class ProtocolManager:
         for proto_code, proto_values in protocols.items():
             names = self.DECODED_NAMES.get(proto_code,None)
             if names is None:
+                log.warning('Unknown protocol [%04X] (%d) values %s', proto_code, proto_code, proto_values)
                 continue
+            log.info('Registering protocol %d [%s] values %s',proto_code,names[0],proto_values)
             self.protocols['protocol.%s' % names[0]] = proto_code
             for index, value_name in enumerate(names[1:]):
                 self.protocols['datatype.%s' % value_name] = proto_values[ index ]
@@ -301,6 +295,9 @@ class ProtocolManager:
 
     def datatype (self, name):
         return self.protocols['datatype.%s' % name]
+
+    def has_datatype(self, name):
+        return self.protocols.get('datatype.%s' % name, None) is not None
 
     def enforce_support (self, name):
         if self.supports(name):

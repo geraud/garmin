@@ -55,9 +55,17 @@ class Forerunner (USBPacketDevice):
         self.send_command( TransferCourses )
         return self.get_records(Packet.COURSE)
 
+    def get_course_points (self):
+        self.send_command( TransferCoursePoints )
+        return self.get_records(Packet.COURSE_POINT)
+
     def get_course_laps (self):
         self.send_command( TransferCourseLaps )
         return self.get_records(Packet.COURSE_LAP)
+
+    def get_course_tracks (self):
+        self.send_command( TransferCourseTracks )
+        return self.execute_reader( self.course_track_reader() )
 
     def get_runs (self):
         self.send_command( TransferRuns )
@@ -72,7 +80,7 @@ class Forerunner (USBPacketDevice):
 
     def get_track_log (self):
         self.send_command( TransferTrackLog )
-        return self.execute_reader( self.track_log_reader() )
+        return self.execute_reader( self.serial_array_reader(Packet.TRACK_HEADER, Packet.TRACK_DATA) )
 
     def get_single_record (self, expected_packet_id):
         packet_id, response = self.read_response()
@@ -120,21 +128,21 @@ class Forerunner (USBPacketDevice):
 
         yield records
 
-    def track_log_reader ( self ):
+    def serial_array_reader (self, header_packet_id, data_packet_id):
         records = []
         packet_id, record_count = yield
         if packet_id != Packet.RECORDS:
             raise UnexpectedPacketException(packet_id)
 
-        last_track = Obj( header = None, data = [] )
+        last_array = Obj( header = None, data = [] )
         for i in xrange(record_count ):
             packet_id, data = yield
-            if packet_id == Packet.TRACK_HEADER:
-                if last_track.header is not None:
-                    records.append( last_track )
-                last_track = Obj( header = data, data = [] )
-            elif packet_id == Packet.TRACK_DATA:
-                last_track.data.extend( data )
+            if packet_id == header_packet_id:
+                if last_array.header is not None:
+                    records.append( last_array )
+                last_array = Obj( header = data, data = [] )
+            elif packet_id == data_packet_id:
+                last_array.data.extend( data )
             else:
                 raise UnexpectedPacketException(packet_id)
 
@@ -144,5 +152,8 @@ class Forerunner (USBPacketDevice):
 
         yield records
 
-
+    def course_track_reader ( self ):
+        if self.get_protocols().has_datatype('course.track.header'):
+            raise NotImplementd, 'course track is not implemeted'
+        return self.serial_array_reader(Packet.COURSE_TRACK_HEADER,Packet.COURSE_TRACK_DATA)
 
