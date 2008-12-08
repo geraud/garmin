@@ -51,33 +51,31 @@ class AbortTransfer (Base):
     Codes = [ 0, 0 ]
     RequiredProtocol = []
 
-class Transfer (Base): pass
-
-class TransferAlmanac (Transfer):
+class TransferAlmanac (Base):
     Codes = [ 1, 4]
     RequiredProtocol = [ 'almanac' ]
 
-class TransferPosition (Transfer):
+class TransferPosition (Base):
     Codes = [ 2, None ]
     RequiredProtocol = [ 'position' ]
 
-class TransferProximityWaypoints (Transfer):
+class TransferProximityWaypoints (Base):
     Codes = [ 3, 17 ]
     RequiredProtocol = [ 'waypoint.proximity' ]
 
-class TransferRoute (Transfer):
+class TransferRoute (Base):
     Codes = [ 4, 8 ]
     RequiredProtocol = [ 'route' ]
 
-class TransferTime (Transfer):
+class TransferTime (Base):
     Codes = [ 5, 20 ]
     RequiredProtocol = [ 'date_time' ]
 
-class TransferTrackLog (Transfer):
+class TransferTrackLog (Base):
     Codes = [ 6, None ]
     RequiredProtocol = [ 'track' ]
 
-class TransferWaypoints (Transfer):
+class TransferWaypoints (Base):
     Codes = [ 7, 21 ]
     RequiredProtocol = [ 'waypoint' ]
 
@@ -93,56 +91,57 @@ class StopPVTDownload (Base):
     Codes = [ 50, None ]
     RequiredProtocol = [ 'pvt' ]
 
-class TransferFlightBook (Transfer):
+class TransferFlightBook (Base):
     Codes = [ 92, None ]
     RequiredProtocol = [ 'flightbook' ]
 
-class TransferLaps (Transfer):
+class TransferLaps (Base):
     Codes = [ 117, None ]
     RequiredProtocol = [ 'lap' ]
 
-class TransferWaypointCategories (Transfer):
+class TransferWaypointCategories (Base):
     Codes = [ 121, None ]
     RequiredProtocol = [ 'waypoint.category' ]
 
-class TransferRuns (Transfer):
+class TransferRuns (Base):
     Codes = [ 450, None ]
     RequiredProtocol = [ 'run' ]
 
-class TransferWorkouts (Transfer):
+class TransferWorkouts (Base):
     Codes = [ 451, None ]
     RequiredProtocol = [ 'workout' ]
 
-class TransferWorkoutOccurrences (Transfer):
+class TransferWorkoutOccurrences (Base):
     Codes = [ 452, None ]
     RequiredProtocol = [ 'workout.occurrence' ]
 
-class TransferFitnessUserProfile (Transfer):
+class TransferFitnessUserProfile (Base):
     Codes = [ 453, None ]
     RequiredProtocol = [ 'fitness' ]
 
-class TransferWorkoutLimits (Transfer):
+class TransferWorkoutLimits (Base):
     Codes = [ 454, None ]
     RequiredProtocol = [ 'workout.limits' ]
 
-class TransferCourses (Transfer):
+class TransferCourses (Base):
     Codes = [ 561, None ]
     RequiredProtocol = [ 'course' ]
 
-class TransferCourseLaps (Transfer):
+class TransferCourseLaps (Base):
     Codes = [ 562, None ]
     RequiredProtocol = [ 'course.lap' ]
 
-class TransferCoursePoints (Transfer):
+class TransferCoursePoints (Base):
     Codes = [ 563, None ]
     RequiredProtocol = [ 'course.lap' ]
 
-class TransferCourseTracks (Transfer):
+class TransferCourseTracks (Base):
     Codes = [ 564, None ]
 
     def check_protocol_support( self, device ):
         return device.supports('track') or device.supports('course.track')
 
-class TransferCourseLimits (Transfer):
+class TransferCourseLimits (Base):
     Codes = [ 565, None ]
     RequiredProtocol = [ 'course.limits' ]
+
