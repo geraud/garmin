@@ -4,6 +4,7 @@ import logging
 from garmin.device import Forerunner
 
 log = logging.getLogger('main')
+dbg = log.debug
 
 def init_logging ():
     logger = logging.getLogger()
@@ -31,8 +32,9 @@ def main():
         dev.start_session()
         dev.get_device_capabilities()
 
+        dbg('loading courses')
         res = dev.get_courses()
-        log.debug('res: %s', res )
+        dbg('res: %s', res )
 
         res = dev.get_course_points()
         dump_many(res, prefix ='course points')
@@ -52,7 +54,8 @@ def main():
 
         almanac = dev.get_almanac()
         log.debug('found %d almanac', len(almanac))
-        runs,laps,c = dev.get_runs()
+        dbg('Reading Runs')
+        runs, laps, tracks = dev.get_runs()
         dump_many(runs)
         dump_many(laps)
     finally:
