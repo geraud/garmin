@@ -166,7 +166,9 @@ class USBPacketDevice( GarminUSB ):
         datatype = self.datatype_for('track.data', 304)
         keys = ( 'position', 'time', 'altitude', 'distance', 'heart_rate', 'cadence', 'sensor' )
         values = ( sr.read_position(), sr.read_time() ) + sr.read('2f 3B')
-        return objectify(keys,values)
+        result  = objectify(keys,values)
+        log.debug("time %s", result.time)
+        return result
 
     def d_almanac_data (self, sr):
         datatype = self.datatype_for('almanac', 501)

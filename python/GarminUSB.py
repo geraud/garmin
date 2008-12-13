@@ -53,8 +53,12 @@ def main():
         almanac = dev.get_almanac()
         log.debug('found %d almanac', len(almanac))
         runs,laps,c = dev.get_runs()
+        log.debug("Runs:")
         dump_many(runs)
+        log.debug("Laps:")
         dump_many(laps)
+        log.debug("Track?:")
+        dump_many(c)
     finally:
         dev.close()
 

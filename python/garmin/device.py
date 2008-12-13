@@ -145,7 +145,7 @@ class Forerunner (USBPacketDevice):
                     records.append( last_array )
                 last_array = Obj( header = data, data = [] )
             elif packet_id == data_packet_id:
-                last_array.data.extend( data )
+                last_array.data.append( data )
             else:
                 raise UnexpectedPacketException(packet_id)
 
